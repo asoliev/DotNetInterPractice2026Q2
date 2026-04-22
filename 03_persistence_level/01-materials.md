@@ -1,0 +1,5 @@
+-   Revise ‘SQL Fundamentals’, ‘ORM Fundamentals’ and ‘Introduction to No-SQL’ modules materials from [.NET Mentoring Program Basics](https://learn.epam.com/detailsPage?id=1d6fcef8-36ae-4102-ae4b-ed6ff1641077) course (review, 60 min)
+-   [SQL vs NoSQL](https://www.mongodb.com/nosql-explained/nosql-vs-sql)
+-   [When to Use a NoSQL Database](https://www.mongodb.com/nosql-explained/when-to-use-nosql)
+-   [What is a Document Database?](https://www.mongodb.com/document-databases) (10m, reading)
+-   [Data-Access Layer](https://www.geeksforgeeks.org/data-access-layer/)
