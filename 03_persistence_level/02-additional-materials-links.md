@@ -1,0 +1,2 @@
+-   [NoSQL Essential Training](https://www.linkedin.com/learning/nosql-essential-training)
+-   [M001: MongoDB Basics](https://university.mongodb.com/courses/M001/about) (8,5h, course)
