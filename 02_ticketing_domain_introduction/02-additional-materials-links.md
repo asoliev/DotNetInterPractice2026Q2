@@ -1,0 +1,1 @@
+-   [The Evolution of Event Ticketing](https://medium.com/@himanisheth1995/the-evolution-of-event-ticketing-d3041d6419a9) (reading, 6m)
