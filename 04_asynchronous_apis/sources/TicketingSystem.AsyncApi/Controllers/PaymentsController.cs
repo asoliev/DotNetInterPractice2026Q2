@@ -1,10 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
-using TicketingSystem.AsyncApi.Services;
-using TicketingSystem.DAL.EF;
+using TicketingSystem.DAL.Interfaces;
 using TicketingSystem.Domain.Entities;
 using TicketingSystem.Domain.Enums;
 
@@ -12,12 +9,12 @@ namespace TicketingSystem.AsyncApi.Controllers;
 
 [ApiController]
 [Route("payments")]
-public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext dbContext) : ControllerBase
+public class PaymentsController(IUnitOfWork unitOfWork) : ControllerBase
 {
     [HttpGet("{paymentId:guid}")]
-    public ActionResult<PaymentResponse> GetPaymentAsync(Guid paymentId)
+    public async Task<ActionResult<PaymentResponse>> GetPaymentAsync(Guid paymentId)
     {
-        PaymentRecord? payment = paymentStore.Get(paymentId);
+        Payment? payment = await unitOfWork.Payments.GetByIdAsync(paymentId);
         if (payment is null)
             return NotFound(new ApiErrorResponse { Message = $"Payment {paymentId} not found." });
 
@@ -32,28 +29,32 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
     [HttpPost("{paymentId:guid}/complete")]
     public async Task<ActionResult<PaymentStatusUpdateResponse>> CompletePaymentAsync(Guid paymentId)
     {
-        PaymentRecord? payment = paymentStore.Get(paymentId);
+        Payment? payment = await unitOfWork.Payments.GetWithOrderAsync(paymentId);
         if (payment is null)
             return NotFound(new ApiErrorResponse { Message = $"Payment {paymentId} not found." });
 
-        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync();
+        if (payment.Status == PaymentStatus.Completed)
+        {
+            return Ok(new PaymentStatusUpdateResponse
+            {
+                PaymentId = payment.Id,
+                Status = nameof(PaymentStatus.Completed)
+            });
+        }
+
+        await unitOfWork.BeginTransactionAsync();
         try
         {
-            foreach (int eventSeatId in payment.EventSeatIds)
+            foreach (OrderItem orderItem in payment.Order.Items)
             {
-                EventSeat? eventSeat = await dbContext.EventSeats.FirstOrDefaultAsync(es => es.Id == eventSeatId);
-                if (eventSeat is null)
-                    return NotFound(new ApiErrorResponse { Message = $"EventSeat {eventSeatId} not found." });
-
-                eventSeat.Status = SeatStatus.Sold;
+                orderItem.EventSeat.Status = SeatStatus.Sold;
             }
 
-            Order? order = await dbContext.Orders.FirstOrDefaultAsync(o => o.Id == payment.OrderId);
-            order?.Status = OrderStatus.Confirmed;
+            payment.Order.Status = OrderStatus.Confirmed;
+            payment.Status = PaymentStatus.Completed;
 
-            paymentStore.UpdateStatus(paymentId, PaymentStatus.Completed);
-            await dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitTransactionAsync();
 
             return Ok(new PaymentStatusUpdateResponse
             {
@@ -63,7 +64,7 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
         }
         catch
         {
-            await transaction.RollbackAsync();
+            await unitOfWork.RollbackTransactionAsync();
             throw;
         }
     }
@@ -71,28 +72,32 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
     [HttpPost("{paymentId:guid}/failed")]
     public async Task<ActionResult<PaymentStatusUpdateResponse>> FailPaymentAsync(Guid paymentId)
     {
-        PaymentRecord? payment = paymentStore.Get(paymentId);
+        Payment? payment = await unitOfWork.Payments.GetWithOrderAsync(paymentId);
         if (payment is null)
             return NotFound(new ApiErrorResponse { Message = $"Payment {paymentId} not found." });
 
-        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync();
+        if (payment.Status == PaymentStatus.Failed)
+        {
+            return Ok(new PaymentStatusUpdateResponse
+            {
+                PaymentId = payment.Id,
+                Status = nameof(PaymentStatus.Failed)
+            });
+        }
+
+        await unitOfWork.BeginTransactionAsync();
         try
         {
-            foreach (int eventSeatId in payment.EventSeatIds)
+            foreach (OrderItem orderItem in payment.Order.Items)
             {
-                EventSeat? eventSeat = await dbContext.EventSeats.FirstOrDefaultAsync(es => es.Id == eventSeatId);
-                if (eventSeat is null)
-                    return NotFound(new ApiErrorResponse { Message = $"EventSeat {eventSeatId} not found." });
-
-                eventSeat.Status = SeatStatus.Available;
+                orderItem.EventSeat.Status = SeatStatus.Available;
             }
 
-            Order? order = await dbContext.Orders.FirstOrDefaultAsync(o => o.Id == payment.OrderId);
-            order?.Status = OrderStatus.Cancelled;
+            payment.Order.Status = OrderStatus.Cancelled;
+            payment.Status = PaymentStatus.Failed;
 
-            paymentStore.UpdateStatus(paymentId, PaymentStatus.Failed);
-            await dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitTransactionAsync();
 
             return Ok(new PaymentStatusUpdateResponse
             {
@@ -102,7 +107,7 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
         }
         catch
         {
-            await transaction.RollbackAsync();
+            await unitOfWork.RollbackTransactionAsync();
             throw;
         }
     }

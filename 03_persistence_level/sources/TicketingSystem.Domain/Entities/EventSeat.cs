@@ -13,4 +13,5 @@ public class EventSeat
     public Event Event { get; set; } = null!;
     public Seat Seat { get; set; } = null!;
     public OrderItem? OrderItem { get; set; }
+    public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
 }
