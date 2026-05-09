@@ -10,25 +10,25 @@ using TicketingSystem.Domain.Enums;
 namespace TicketingSystem.AsyncApi.Controllers;
 
 [ApiController]
-[Route("orders/carts")]
+[Route("orders/carts/{cartId:guid}")]
 public class OrdersController(
     IUnitOfWork unitOfWork,
     ICartStore cartStore,
     IPaymentStore paymentStore,
     TicketingDbContext dbContext) : ControllerBase
 {
-    [HttpGet("{cartId:guid}")]
+    [HttpGet("")]
     public async Task<IActionResult> GetCartAsync(Guid cartId)
     {
-        var cart = cartStore.GetOrCreate(cartId);
-        var state = await BuildCartStateAsync(cartId, cart.Items);
+        CartState cart = cartStore.GetOrCreate(cartId);
+        object state = await BuildCartStateAsync(cartId, cart.Items);
         return Ok(state);
     }
 
-    [HttpPost("{cartId:guid}")]
+    [HttpPost("")]
     public async Task<IActionResult> AddSeatToCartAsync(Guid cartId, [FromBody] AddSeatToCartRequest request)
     {
-        var eventSeat = await dbContext.EventSeats
+        EventSeat? eventSeat = await dbContext.EventSeats
             .AsNoTracking()
             .Include(es => es.Seat)
             .FirstOrDefaultAsync(es => es.EventId == request.EventId && es.SeatId == request.SeatId);
@@ -44,27 +44,27 @@ public class OrdersController(
 
         cartStore.AddItem(cartId, request.EventId, request.SeatId, request.PriceId);
 
-        var cart = cartStore.GetOrCreate(cartId);
-        var state = await BuildCartStateAsync(cartId, cart.Items);
+        CartState cart = cartStore.GetOrCreate(cartId);
+        object state = await BuildCartStateAsync(cartId, cart.Items);
         return Ok(state);
     }
 
-    [HttpDelete("{cartId:guid}/events/{eventId:int}/seats/{seatId:int}")]
+    [HttpDelete("events/{eventId:int}/seats/{seatId:int}")]
     public async Task<IActionResult> RemoveSeatFromCartAsync(Guid cartId, int eventId, int seatId)
     {
         bool removed = cartStore.RemoveItem(cartId, eventId, seatId);
         if (!removed)
             return NotFound(new { message = "Item not found in cart." });
 
-        var cart = cartStore.GetOrCreate(cartId);
-        var state = await BuildCartStateAsync(cartId, cart.Items);
+        CartState cart = cartStore.GetOrCreate(cartId);
+        object state = await BuildCartStateAsync(cartId, cart.Items);
         return Ok(state);
     }
 
-    [HttpPut("{cartId:guid}/book")]
+    [HttpPut("book")]
     public async Task<IActionResult> BookCartAsync(Guid cartId)
     {
-        var cart = cartStore.GetOrCreate(cartId);
+        CartState cart = cartStore.GetOrCreate(cartId);
         if (cart.Items.Count == 0)
             return BadRequest(new { message = "Cart is empty." });
 
@@ -75,7 +75,7 @@ public class OrdersController(
 
         foreach (var key in distinctEventSeatKeys)
         {
-            var eventSeat = await dbContext.EventSeats
+            EventSeat? eventSeat = await dbContext.EventSeats
                 .AsNoTracking()
                 .FirstOrDefaultAsync(es => es.EventId == key.EventId && es.SeatId == key.SeatId);
 
@@ -89,9 +89,9 @@ public class OrdersController(
         await unitOfWork.BeginTransactionAsync();
         try
         {
-            var customer = await GetOrCreateCustomerForCartAsync(cartId);
+            Customer customer = await GetOrCreateCustomerForCartAsync(cartId);
 
-            var order = new Order
+            Order order = new()
             {
                 CustomerId = customer.Id,
                 CreatedAt = DateTime.UtcNow,
@@ -101,10 +101,10 @@ public class OrdersController(
             await unitOfWork.Orders.AddAsync(order);
             await unitOfWork.SaveChangesAsync();
 
-            var bookedSeatIds = new List<int>();
-            foreach (var cartItem in cart.Items)
+            List<int> bookedSeatIds = [];
+            foreach (CartItem cartItem in cart.Items)
             {
-                var eventSeat = await dbContext.EventSeats
+                EventSeat? eventSeat = await dbContext.EventSeats
                     .FirstOrDefaultAsync(es => es.EventId == cartItem.EventId && es.SeatId == cartItem.SeatId);
 
                 if (eventSeat is null)
@@ -113,7 +113,7 @@ public class OrdersController(
                 eventSeat.Status = SeatStatus.Booked;
                 bookedSeatIds.Add(eventSeat.Id);
 
-                await dbContext.OrderItems.AddAsync(new OrderItem
+                await dbContext.OrderItems.AddAsync(new()
                 {
                     OrderId = order.Id,
                     EventSeatId = eventSeat.Id,
@@ -146,12 +146,12 @@ public class OrdersController(
 
     private async Task<object> BuildCartStateAsync(Guid cartId, IReadOnlyCollection<CartItem> items)
     {
-        var itemResponses = new List<object>();
+        List<object> itemResponses = [];
         decimal totalAmount = 0m;
 
         foreach (CartItem item in items)
         {
-            var eventSeat = await dbContext.EventSeats
+            EventSeat? eventSeat = await dbContext.EventSeats
                 .AsNoTracking()
                 .Include(es => es.Seat)
                 .FirstOrDefaultAsync(es => es.EventId == item.EventId && es.SeatId == item.SeatId);
@@ -185,7 +185,7 @@ public class OrdersController(
         if (existing is not null)
             return existing;
 
-        var customer = new Customer
+        Customer customer = new()
         {
             Name = $"Cart {cartId:N}",
             Email = email

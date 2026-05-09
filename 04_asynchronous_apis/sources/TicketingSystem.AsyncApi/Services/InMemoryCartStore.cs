@@ -7,7 +7,7 @@ public class InMemoryCartStore : ICartStore
     private readonly ConcurrentDictionary<Guid, CartState> _carts = new();
 
     public CartState GetOrCreate(Guid cartId) =>
-        _carts.GetOrAdd(cartId, _ => new CartState(cartId));
+        _carts.GetOrAdd(cartId, static id => new CartState(id));
 
     public void AddItem(Guid cartId, int eventId, int seatId, int priceId)
     {
@@ -40,12 +40,10 @@ public class InMemoryCartStore : ICartStore
 
     public void Clear(Guid cartId)
     {
-        if (_carts.TryGetValue(cartId, out CartState? cart))
+        if (!_carts.TryGetValue(cartId, out CartState? cart)) return;
+        lock (cart.SyncRoot)
         {
-            lock (cart.SyncRoot)
-            {
-                cart.Items.Clear();
-            }
+            cart.Items.Clear();
         }
     }
 }
