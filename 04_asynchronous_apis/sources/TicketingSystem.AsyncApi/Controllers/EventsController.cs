@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TicketingSystem.DAL.Interfaces;
+using TicketingSystem.Domain.Entities;
 
 namespace TicketingSystem.AsyncApi.Controllers;
 
@@ -10,7 +11,7 @@ public class EventsController(IUnitOfWork unitOfWork) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetEventsAsync()
     {
-        var events = await unitOfWork.Events.GetAllAsync();
+        IEnumerable<Event> events = await unitOfWork.Events.GetAllAsync();
 
         var response = events
             .OrderBy(e => e.Date)
@@ -29,11 +30,11 @@ public class EventsController(IUnitOfWork unitOfWork) : ControllerBase
     [HttpGet("{eventId:int}/sections/{sectionId:int}/seats")]
     public async Task<IActionResult> GetSectionSeatsAsync(int eventId, int sectionId)
     {
-        var eventEntity = await unitOfWork.Events.GetByIdAsync(eventId);
+        Event? eventEntity = await unitOfWork.Events.GetByIdAsync(eventId);
         if (eventEntity is null)
             return NotFound(new { message = $"Event {eventId} not found." });
 
-        var eventSeats = await unitOfWork.EventSeats.GetByEventIdAsync(eventId);
+        IEnumerable<EventSeat> eventSeats = await unitOfWork.EventSeats.GetByEventIdAsync(eventId);
 
         var seats = eventSeats
             .Where(es => es.Seat.SectionId == sectionId)
