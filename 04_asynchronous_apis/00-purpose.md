@@ -1,0 +1,1 @@
+The purpose of the module is to consolidate in practice the materials on ‘Async programing’ and ‘REST Architectures’ topics as well as to enhance it. This module will explain the benefits and best practices for building async APIs with ASP.NET Core.
