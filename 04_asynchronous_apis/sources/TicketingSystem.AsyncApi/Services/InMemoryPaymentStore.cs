@@ -8,8 +8,8 @@ public class InMemoryPaymentStore : IPaymentStore
 
     public Guid CreatePayment(int orderId, IReadOnlyCollection<int> eventSeatIds)
     {
-        Guid id = Guid.NewGuid();
-        var record = new PaymentRecord(id, orderId, eventSeatIds.ToArray(), PaymentStatus.Pending);
+        var id = Guid.NewGuid();
+        PaymentRecord record = new(id, orderId, eventSeatIds.ToArray(), PaymentStatus.Pending);
         _payments[id] = record;
         return id;
     }

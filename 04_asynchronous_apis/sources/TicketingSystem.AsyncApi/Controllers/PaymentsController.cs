@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using TicketingSystem.AsyncApi.Services;
 using TicketingSystem.DAL.EF;
+using TicketingSystem.Domain.Entities;
 using TicketingSystem.Domain.Enums;
 
 namespace TicketingSystem.AsyncApi.Controllers;
@@ -13,7 +15,7 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
     [HttpGet("{paymentId:guid}")]
     public IActionResult GetPaymentAsync(Guid paymentId)
     {
-        var payment = paymentStore.Get(paymentId);
+        PaymentRecord? payment = paymentStore.Get(paymentId);
         if (payment is null)
             return NotFound(new { message = $"Payment {paymentId} not found." });
 
@@ -28,25 +30,24 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
     [HttpPost("{paymentId:guid}/complete")]
     public async Task<IActionResult> CompletePaymentAsync(Guid paymentId)
     {
-        var payment = paymentStore.Get(paymentId);
+        PaymentRecord? payment = paymentStore.Get(paymentId);
         if (payment is null)
             return NotFound(new { message = $"Payment {paymentId} not found." });
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync();
         try
         {
             foreach (int eventSeatId in payment.EventSeatIds)
             {
-                var eventSeat = await dbContext.EventSeats.FirstOrDefaultAsync(es => es.Id == eventSeatId);
+                EventSeat? eventSeat = await dbContext.EventSeats.FirstOrDefaultAsync(es => es.Id == eventSeatId);
                 if (eventSeat is null)
                     return NotFound(new { message = $"EventSeat {eventSeatId} not found." });
 
                 eventSeat.Status = SeatStatus.Sold;
             }
 
-            var order = await dbContext.Orders.FirstOrDefaultAsync(o => o.Id == payment.OrderId);
-            if (order is not null)
-                order.Status = OrderStatus.Confirmed;
+            Order? order = await dbContext.Orders.FirstOrDefaultAsync(o => o.Id == payment.OrderId);
+            order?.Status = OrderStatus.Confirmed;
 
             paymentStore.UpdateStatus(paymentId, PaymentStatus.Completed);
             await dbContext.SaveChangesAsync();
@@ -55,7 +56,7 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
             return Ok(new
             {
                 paymentId = payment.Id,
-                status = PaymentStatus.Completed.ToString()
+                status = nameof(PaymentStatus.Completed)
             });
         }
         catch
@@ -68,25 +69,24 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
     [HttpPost("{paymentId:guid}/failed")]
     public async Task<IActionResult> FailPaymentAsync(Guid paymentId)
     {
-        var payment = paymentStore.Get(paymentId);
+        PaymentRecord? payment = paymentStore.Get(paymentId);
         if (payment is null)
             return NotFound(new { message = $"Payment {paymentId} not found." });
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync();
         try
         {
             foreach (int eventSeatId in payment.EventSeatIds)
             {
-                var eventSeat = await dbContext.EventSeats.FirstOrDefaultAsync(es => es.Id == eventSeatId);
+                EventSeat? eventSeat = await dbContext.EventSeats.FirstOrDefaultAsync(es => es.Id == eventSeatId);
                 if (eventSeat is null)
                     return NotFound(new { message = $"EventSeat {eventSeatId} not found." });
 
                 eventSeat.Status = SeatStatus.Available;
             }
 
-            var order = await dbContext.Orders.FirstOrDefaultAsync(o => o.Id == payment.OrderId);
-            if (order is not null)
-                order.Status = OrderStatus.Cancelled;
+            Order? order = await dbContext.Orders.FirstOrDefaultAsync(o => o.Id == payment.OrderId);
+            order?.Status = OrderStatus.Cancelled;
 
             paymentStore.UpdateStatus(paymentId, PaymentStatus.Failed);
             await dbContext.SaveChangesAsync();
@@ -95,7 +95,7 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
             return Ok(new
             {
                 paymentId = payment.Id,
-                status = PaymentStatus.Failed.ToString()
+                status = nameof(PaymentStatus.Failed)
             });
         }
         catch

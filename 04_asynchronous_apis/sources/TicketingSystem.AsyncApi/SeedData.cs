@@ -14,13 +14,13 @@ public static class SeedData
         if (await dbContext.Venues.AnyAsync() || await dbContext.Events.AnyAsync())
             return;
 
-        var venue = new Venue
+        Venue venue = new()
         {
             Name = "City Hall Arena",
             Address = "221 Main Street"
         };
 
-        var sectionA = new Section
+        Section sectionA = new()
         {
             Name = "A",
             RowCount = 2,
@@ -28,7 +28,7 @@ public static class SeedData
             Venue = venue
         };
 
-        var sectionB = new Section
+        Section sectionB = new()
         {
             Name = "B",
             RowCount = 2,
@@ -36,11 +36,11 @@ public static class SeedData
             Venue = venue
         };
 
-        var seats = new List<Seat>();
+        List<Seat> seats = [];
         CreateSeats(sectionA, seats);
         CreateSeats(sectionB, seats);
 
-        var eventEntity = new Event
+        Event eventEntity = new()
         {
             Venue = venue,
             Title = "Symphonic Evening",
@@ -54,7 +54,7 @@ public static class SeedData
         await dbContext.Events.AddAsync(eventEntity);
         await dbContext.SaveChangesAsync();
 
-        var eventSeats = seats.Select((seat, idx) => new EventSeat
+        IEnumerable<EventSeat> eventSeats = seats.Select((seat, idx) => new EventSeat
         {
             EventId = eventEntity.Id,
             SeatId = seat.Id,
@@ -72,7 +72,7 @@ public static class SeedData
         {
             for (int number = 1; number <= section.SeatsPerRow; number++)
             {
-                seats.Add(new Seat
+                seats.Add(new Seat()
                 {
                     Section = section,
                     Row = row,
