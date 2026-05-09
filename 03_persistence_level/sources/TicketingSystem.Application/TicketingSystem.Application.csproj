@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TicketingSystem.Domain\TicketingSystem.Domain.csproj" />
+    <ProjectReference Include="..\TicketingSystem.DAL\TicketingSystem.DAL.csproj" />
+    <ProjectReference Include="..\TicketingSystem.DAL.EF\TicketingSystem.DAL.EF.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.7" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseAppHost>false</UseAppHost>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <Target Name="TrimCultureOutputFolders" AfterTargets="Build">
+    <ItemGroup>
+      <_CultureDirs Include="$(OutDir)??" />
+      <_CultureDirs Include="$(OutDir)??-??" />
+      <_CultureDirs Include="$(OutDir)??-????" />
+    </ItemGroup>
+    <RemoveDir Directories="@(_CultureDirs)" />
+  </Target>
+
+</Project>
