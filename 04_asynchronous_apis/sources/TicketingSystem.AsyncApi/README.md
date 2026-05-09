@@ -38,6 +38,44 @@ dotnet build 04_asynchronous_apis/sources/TicketingSystem.AsyncApi.slnx
 dotnet run --project 04_asynchronous_apis/sources/TicketingSystem.AsyncApi/TicketingSystem.AsyncApi.csproj --urls http://localhost:5188
 ```
 
+## Swagger UI
+
+After starting the app, open:
+
+- `http://localhost:5188/swagger`
+
+Swagger UI lets you:
+
+- browse all controllers and routes,
+- execute requests manually,
+- inspect request/response schemas,
+- copy curl commands for terminal testing.
+
+Recommended manual flow in Swagger:
+
+1. Call `GET /events` and note an `eventId`.
+2. Call `GET /events/{event_id}/sections/{section_id}/seats` and choose an available `seatId`.
+3. Generate a cart GUID (for example with `uuidgen`) and call `POST /orders/carts/{cart_id}`.
+4. Call `GET /orders/carts/{cart_id}` to verify cart content and total amount.
+5. Call `PUT /orders/carts/{cart_id}/book` and copy returned `paymentId`.
+6. Call `GET /payments/{payment_id}`.
+7. Call either `POST /payments/{payment_id}/complete` or `POST /payments/{payment_id}/failed`.
+
+## Health Endpoints
+
+The API exposes lightweight health endpoints:
+
+- `GET /health`
+- `GET /health/live`
+- `GET /health/ready`
+
+All three are useful for local checks and deployment probes.
+
+## Startup Behavior
+
+- Root path `/` redirects to `/swagger`.
+- Launch profile is configured to open Swagger automatically (`launchUrl: swagger`).
+
 ## API Endpoints
 
 Base URL used below: `http://localhost:5188`
