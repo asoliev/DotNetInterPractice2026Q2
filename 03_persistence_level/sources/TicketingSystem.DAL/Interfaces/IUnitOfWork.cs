@@ -6,6 +6,8 @@ public interface IUnitOfWork : IDisposable
     IEventSeatRepository EventSeats { get; }
     IOrderRepository Orders { get; }
     ICustomerRepository Customers { get; }
+    ICartRepository Carts { get; }
+    IPaymentRepository Payments { get; }
 
     Task<int> SaveChangesAsync();
     Task BeginTransactionAsync();

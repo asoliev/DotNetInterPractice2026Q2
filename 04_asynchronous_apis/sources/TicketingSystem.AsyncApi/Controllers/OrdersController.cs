@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
-using TicketingSystem.AsyncApi.Services;
-using TicketingSystem.DAL.EF;
 using TicketingSystem.DAL.Interfaces;
 using TicketingSystem.Domain.Entities;
 using TicketingSystem.Domain.Enums;
@@ -13,26 +10,19 @@ namespace TicketingSystem.AsyncApi.Controllers;
 [ApiController]
 [Route("orders/carts/{cartId:guid}")]
 public class OrdersController(
-    IUnitOfWork unitOfWork,
-    ICartStore cartStore,
-    IPaymentStore paymentStore,
-    TicketingDbContext dbContext) : ControllerBase
+    IUnitOfWork unitOfWork) : ControllerBase
 {
     [HttpGet("")]
     public async Task<ActionResult<CartResponse>> GetCartAsync(Guid cartId)
     {
-        CartState cart = cartStore.GetOrCreate(cartId);
-        CartResponse state = await BuildCartStateAsync(cartId, cart.Items);
-        return Ok(state);
+        Cart cart = await GetOrCreateCartAsync(cartId);
+        return Ok(BuildCartState(cart));
     }
 
     [HttpPost("")]
     public async Task<ActionResult<CartResponse>> AddSeatToCartAsync(Guid cartId, [FromBody] AddSeatToCartRequest request)
     {
-        EventSeat? eventSeat = await dbContext.EventSeats
-            .AsNoTracking()
-            .Include(es => es.Seat)
-            .FirstOrDefaultAsync(es => es.EventId == request.EventId && es.SeatId == request.SeatId);
+        EventSeat? eventSeat = await unitOfWork.EventSeats.GetByEventAndSeatAsync(request.EventId, request.SeatId);
 
         if (eventSeat is null)
             return NotFound(new ApiErrorResponse { Message = "Seat for the event was not found." });
@@ -43,48 +33,68 @@ public class OrdersController(
         if (request.PriceId <= 0)
             return BadRequest(new ApiErrorResponse { Message = "priceId must be greater than 0." });
 
-        cartStore.AddItem(cartId, request.EventId, request.SeatId, request.PriceId);
+        Cart cart = await GetOrCreateCartAsync(cartId);
+        CartItem? existingItem = await unitOfWork.Carts.GetItemAsync(cartId, request.EventId, request.SeatId);
+        if (existingItem is null)
+        {
+            await unitOfWork.Carts.AddItemAsync(new CartItem
+            {
+                CartId = cartId,
+                EventSeatId = eventSeat.Id,
+                PriceId = request.PriceId
+            });
+            cart.UpdatedAt = DateTime.UtcNow;
+            await unitOfWork.SaveChangesAsync();
+        }
 
-        CartState cart = cartStore.GetOrCreate(cartId);
-        CartResponse state = await BuildCartStateAsync(cartId, cart.Items);
+        Cart? persistedCart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
+        if (persistedCart is null)
+            return NotFound(new ApiErrorResponse { Message = $"Cart {cartId} not found." });
+
+        CartResponse state = BuildCartState(persistedCart);
         return Ok(state);
     }
 
     [HttpDelete("events/{eventId:int}/seats/{seatId:int}")]
     public async Task<ActionResult<CartResponse>> RemoveSeatFromCartAsync(Guid cartId, int eventId, int seatId)
     {
-        bool removed = cartStore.RemoveItem(cartId, eventId, seatId);
-        if (!removed)
+        Cart? cart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
+        if (cart is null)
+            return NotFound(new ApiErrorResponse { Message = "Cart was not found." });
+
+        CartItem? cartItem = await unitOfWork.Carts.GetItemAsync(cartId, eventId, seatId);
+        if (cartItem is null)
             return NotFound(new ApiErrorResponse { Message = "Item not found in cart." });
 
-        CartState cart = cartStore.GetOrCreate(cartId);
-        CartResponse state = await BuildCartStateAsync(cartId, cart.Items);
+        unitOfWork.Carts.RemoveItem(cartItem);
+        cart.UpdatedAt = DateTime.UtcNow;
+        await unitOfWork.SaveChangesAsync();
+
+        Cart? updatedCart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
+        if (updatedCart is null)
+            return NotFound(new ApiErrorResponse { Message = "Cart was not found." });
+
+        CartResponse state = BuildCartState(updatedCart);
         return Ok(state);
     }
 
     [HttpPut("book")]
     public async Task<ActionResult<BookCartResponse>> BookCartAsync(Guid cartId)
     {
-        CartState cart = cartStore.GetOrCreate(cartId);
+        Cart? cart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
+        if (cart is null)
+            return NotFound(new ApiErrorResponse { Message = "Cart was not found." });
+
         if (cart.Items.Count == 0)
             return BadRequest(new ApiErrorResponse { Message = "Cart is empty." });
 
-        var distinctEventSeatKeys = cart.Items
-            .Select(i => new { i.EventId, i.SeatId })
-            .Distinct()
-            .ToList();
-
-        foreach (var key in distinctEventSeatKeys)
+        foreach (CartItem cartItem in cart.Items)
         {
-            EventSeat? eventSeat = await dbContext.EventSeats
-                .AsNoTracking()
-                .FirstOrDefaultAsync(es => es.EventId == key.EventId && es.SeatId == key.SeatId);
-
-            if (eventSeat is null)
-                return NotFound(new ApiErrorResponse { Message = $"Seat {key.SeatId} for event {key.EventId} was not found." });
-
-            if (eventSeat.Status != SeatStatus.Available)
-                return Conflict(new ApiErrorResponse { Message = $"Seat {key.SeatId} for event {key.EventId} is not available." });
+            if (cartItem.EventSeat.Status != SeatStatus.Available)
+                return Conflict(new ApiErrorResponse
+                {
+                    Message = $"Seat {cartItem.EventSeat.SeatId} for event {cartItem.EventSeat.EventId} is not available."
+                });
         }
 
         await unitOfWork.BeginTransactionAsync();
@@ -102,33 +112,33 @@ public class OrdersController(
             await unitOfWork.Orders.AddAsync(order);
             await unitOfWork.SaveChangesAsync();
 
-            List<int> bookedSeatIds = [];
             foreach (CartItem cartItem in cart.Items)
             {
-                EventSeat? eventSeat = await dbContext.EventSeats
-                    .FirstOrDefaultAsync(es => es.EventId == cartItem.EventId && es.SeatId == cartItem.SeatId);
+                cartItem.EventSeat.Status = SeatStatus.Booked;
 
-                if (eventSeat is null)
-                    throw new InvalidOperationException($"Seat {cartItem.SeatId} for event {cartItem.EventId} was not found during booking.");
-
-                eventSeat.Status = SeatStatus.Booked;
-                bookedSeatIds.Add(eventSeat.Id);
-
-                await dbContext.OrderItems.AddAsync(new()
+                order.Items.Add(new OrderItem
                 {
-                    OrderId = order.Id,
-                    EventSeatId = eventSeat.Id,
-                    PriceAtPurchase = eventSeat.Price
+                    EventSeatId = cartItem.EventSeatId,
+                    PriceAtPurchase = cartItem.EventSeat.Price
                 });
             }
+
+            var payment = new Payment
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                Status = PaymentStatus.Pending,
+                CreatedAt = DateTime.UtcNow
+            };
+            await unitOfWork.Payments.AddAsync(payment);
+
+            unitOfWork.Carts.RemoveItems(cart.Items);
+            cart.UpdatedAt = DateTime.UtcNow;
 
             await unitOfWork.SaveChangesAsync();
             await unitOfWork.CommitTransactionAsync();
 
-            Guid paymentId = paymentStore.CreatePayment(order.Id, bookedSeatIds);
-            cartStore.Clear(cartId);
-
-            return Ok(new BookCartResponse { PaymentId = paymentId });
+            return Ok(new BookCartResponse { PaymentId = payment.Id });
         }
         catch
         {
@@ -145,38 +155,48 @@ public class OrdersController(
         }
     }
 
-    private async Task<CartResponse> BuildCartStateAsync(Guid cartId, IReadOnlyCollection<CartItem> items)
+    private static CartResponse BuildCartState(Cart cart)
     {
         List<CartItemResponse> itemResponses = [];
         decimal totalAmount = 0m;
 
-        foreach (CartItem item in items)
+        foreach (CartItem item in cart.Items)
         {
-            EventSeat? eventSeat = await dbContext.EventSeats
-                .AsNoTracking()
-                .Include(es => es.Seat)
-                .FirstOrDefaultAsync(es => es.EventId == item.EventId && es.SeatId == item.SeatId);
-
-            if (eventSeat is null)
-                continue;
-
-            totalAmount += eventSeat.Price;
+            totalAmount += item.EventSeat.Price;
             itemResponses.Add(new CartItemResponse
             {
-                EventId = item.EventId,
-                SeatId = item.SeatId,
+                EventId = item.EventSeat.EventId,
+                SeatId = item.EventSeat.SeatId,
                 PriceId = item.PriceId,
-                RowId = eventSeat.Seat.Row,
-                Amount = eventSeat.Price
+                RowId = item.EventSeat.Seat.Row,
+                Amount = item.EventSeat.Price
             });
         }
 
         return new CartResponse
         {
-            CartId = cartId,
+            CartId = cart.Id,
             Items = itemResponses,
             TotalAmount = totalAmount
         };
+    }
+
+    private async Task<Cart> GetOrCreateCartAsync(Guid cartId)
+    {
+        Cart? cart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
+        if (cart is not null)
+            return cart;
+
+        cart = new Cart
+        {
+            Id = cartId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await unitOfWork.Carts.AddAsync(cart);
+        await unitOfWork.SaveChangesAsync();
+        return cart;
     }
 
     private async Task<Customer> GetOrCreateCustomerForCartAsync(Guid cartId)

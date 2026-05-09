@@ -25,6 +25,11 @@ public class EventSeatRepository(TicketingDbContext context) : Repository<EventS
             .OrderBy(es => es.Price)
             .FirstOrDefaultAsync();
 
+    public async Task<EventSeat?> GetByEventAndSeatAsync(int eventId, int seatId) =>
+        await DbSet
+            .Include(es => es.Seat)
+            .FirstOrDefaultAsync(es => es.EventId == eventId && es.SeatId == seatId);
+
     public async Task<bool> TryChangeStatusAsync(int eventSeatId, SeatStatus expectedStatus, SeatStatus newStatus)
     {
         EventSeat? eventSeat = await DbSet.FindAsync(eventSeatId);

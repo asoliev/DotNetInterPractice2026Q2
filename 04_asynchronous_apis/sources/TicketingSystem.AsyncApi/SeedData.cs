@@ -9,7 +9,7 @@ public static class SeedData
 {
     public static async Task InitializeAsync(TicketingDbContext dbContext)
     {
-        await dbContext.Database.EnsureCreatedAsync();
+        await dbContext.Database.MigrateAsync();
 
         if (await dbContext.Venues.AnyAsync() || await dbContext.Events.AnyAsync())
             return;

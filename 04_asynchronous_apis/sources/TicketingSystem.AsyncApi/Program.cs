@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TicketingSystem.AsyncApi;
-using TicketingSystem.AsyncApi.Services;
 using TicketingSystem.DAL.EF;
 using TicketingSystem.DAL.Interfaces;
 
@@ -10,18 +9,12 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 string dbPath = Path.GetFullPath(Path.Combine(
     builder.Environment.ContentRootPath,
     "..",
-    "..",
-    "..",
-    "03_persistence_level",
-    "sources",
-    "ticketing.db"));
+    "ticketing.asyncapi.db"));
 
 builder.Services.AddDbContext<TicketingDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-builder.Services.AddSingleton<ICartStore, InMemoryCartStore>();
-builder.Services.AddSingleton<IPaymentStore, InMemoryPaymentStore>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

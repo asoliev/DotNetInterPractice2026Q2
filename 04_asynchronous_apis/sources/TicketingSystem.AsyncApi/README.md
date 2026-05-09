@@ -25,9 +25,9 @@ The API references these projects from module 03:
 
 ## Database
 
-- SQLite file used by API: `03_persistence_level/sources/ticketing.db`
+- SQLite file used by API: `04_asynchronous_apis/sources/ticketing.asyncapi.db`
 - Connection is configured in `Program.cs`
-- On startup, `SeedData.InitializeAsync(...)` ensures database exists and adds demo data if empty.
+- On startup, `SeedData.InitializeAsync(...)` applies EF migrations and then seeds demo data if empty.
 
 ## Build And Run
 
@@ -129,9 +129,9 @@ Seats response includes:
 
 ## Notes
 
-- Cart state is kept in memory (`InMemoryCartStore`) keyed by client-provided cart GUID.
-- Payment state is kept in memory (`InMemoryPaymentStore`) keyed by generated payment GUID.
-- Booking flow marks seats as `Booked` and creates an order.
+- Cart state is persisted in SQLite (`Carts` and `CartItems` tables) keyed by client-provided cart GUID.
+- Payment state is persisted in SQLite (`Payments` table) keyed by generated payment GUID.
+- Booking flow marks seats as `Booked`, creates an order, and creates a pending payment.
 - Completing payment marks related seats as `Sold`.
 - Failing payment marks related seats back to `Available`.
 
