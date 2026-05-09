@@ -4,7 +4,7 @@ using TicketingSystem.AsyncApi.Services;
 using TicketingSystem.DAL.EF;
 using TicketingSystem.DAL.Interfaces;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 string dbPath = Path.GetFullPath(Path.Combine(
     builder.Environment.ContentRootPath,
@@ -23,16 +23,20 @@ builder.Services.AddSingleton<ICartStore, InMemoryCartStore>();
 builder.Services.AddSingleton<IPaymentStore, InMemoryPaymentStore>();
 
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 using (IServiceScope scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<TicketingDbContext>();
+    TicketingDbContext dbContext = scope.ServiceProvider.GetRequiredService<TicketingDbContext>();
     await SeedData.InitializeAsync(dbContext);
 }
 
 app.UseHttpsRedirection();
+app.UseSwagger();
+app.UseSwaggerUI();
 app.MapControllers();
 
 await app.RunAsync();

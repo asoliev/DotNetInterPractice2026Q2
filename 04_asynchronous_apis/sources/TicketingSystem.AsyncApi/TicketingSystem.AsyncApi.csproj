@@ -6,6 +6,10 @@
     <ProjectReference Include="../../../03_persistence_level/sources/TicketingSystem.Domain/TicketingSystem.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
