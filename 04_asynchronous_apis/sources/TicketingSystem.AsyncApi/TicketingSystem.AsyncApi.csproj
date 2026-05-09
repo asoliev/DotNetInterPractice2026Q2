@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="../../../03_persistence_level/sources/TicketingSystem.DAL/TicketingSystem.DAL.csproj" />
+    <ProjectReference Include="../../../03_persistence_level/sources/TicketingSystem.DAL.EF/TicketingSystem.DAL.EF.csproj" />
+    <ProjectReference Include="../../../03_persistence_level/sources/TicketingSystem.Domain/TicketingSystem.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
