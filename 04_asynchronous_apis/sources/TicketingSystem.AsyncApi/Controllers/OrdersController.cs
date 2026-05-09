@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TicketingSystem.AsyncApi.Contracts;
+using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.AsyncApi.Services;
 using TicketingSystem.DAL.EF;
 using TicketingSystem.DAL.Interfaces;
@@ -18,15 +19,15 @@ public class OrdersController(
     TicketingDbContext dbContext) : ControllerBase
 {
     [HttpGet("")]
-    public async Task<IActionResult> GetCartAsync(Guid cartId)
+    public async Task<ActionResult<CartResponse>> GetCartAsync(Guid cartId)
     {
         CartState cart = cartStore.GetOrCreate(cartId);
-        object state = await BuildCartStateAsync(cartId, cart.Items);
+        CartResponse state = await BuildCartStateAsync(cartId, cart.Items);
         return Ok(state);
     }
 
     [HttpPost("")]
-    public async Task<IActionResult> AddSeatToCartAsync(Guid cartId, [FromBody] AddSeatToCartRequest request)
+    public async Task<ActionResult<CartResponse>> AddSeatToCartAsync(Guid cartId, [FromBody] AddSeatToCartRequest request)
     {
         EventSeat? eventSeat = await dbContext.EventSeats
             .AsNoTracking()
@@ -34,39 +35,39 @@ public class OrdersController(
             .FirstOrDefaultAsync(es => es.EventId == request.EventId && es.SeatId == request.SeatId);
 
         if (eventSeat is null)
-            return NotFound(new { message = "Seat for the event was not found." });
+            return NotFound(new ApiErrorResponse { Message = "Seat for the event was not found." });
 
         if (eventSeat.Status != SeatStatus.Available)
-            return Conflict(new { message = "Seat is not available." });
+            return Conflict(new ApiErrorResponse { Message = "Seat is not available." });
 
         if (request.PriceId <= 0)
-            return BadRequest(new { message = "priceId must be greater than 0." });
+            return BadRequest(new ApiErrorResponse { Message = "priceId must be greater than 0." });
 
         cartStore.AddItem(cartId, request.EventId, request.SeatId, request.PriceId);
 
         CartState cart = cartStore.GetOrCreate(cartId);
-        object state = await BuildCartStateAsync(cartId, cart.Items);
+        CartResponse state = await BuildCartStateAsync(cartId, cart.Items);
         return Ok(state);
     }
 
     [HttpDelete("events/{eventId:int}/seats/{seatId:int}")]
-    public async Task<IActionResult> RemoveSeatFromCartAsync(Guid cartId, int eventId, int seatId)
+    public async Task<ActionResult<CartResponse>> RemoveSeatFromCartAsync(Guid cartId, int eventId, int seatId)
     {
         bool removed = cartStore.RemoveItem(cartId, eventId, seatId);
         if (!removed)
-            return NotFound(new { message = "Item not found in cart." });
+            return NotFound(new ApiErrorResponse { Message = "Item not found in cart." });
 
         CartState cart = cartStore.GetOrCreate(cartId);
-        object state = await BuildCartStateAsync(cartId, cart.Items);
+        CartResponse state = await BuildCartStateAsync(cartId, cart.Items);
         return Ok(state);
     }
 
     [HttpPut("book")]
-    public async Task<IActionResult> BookCartAsync(Guid cartId)
+    public async Task<ActionResult<BookCartResponse>> BookCartAsync(Guid cartId)
     {
         CartState cart = cartStore.GetOrCreate(cartId);
         if (cart.Items.Count == 0)
-            return BadRequest(new { message = "Cart is empty." });
+            return BadRequest(new ApiErrorResponse { Message = "Cart is empty." });
 
         var distinctEventSeatKeys = cart.Items
             .Select(i => new { i.EventId, i.SeatId })
@@ -80,10 +81,10 @@ public class OrdersController(
                 .FirstOrDefaultAsync(es => es.EventId == key.EventId && es.SeatId == key.SeatId);
 
             if (eventSeat is null)
-                return NotFound(new { message = $"Seat {key.SeatId} for event {key.EventId} was not found." });
+                return NotFound(new ApiErrorResponse { Message = $"Seat {key.SeatId} for event {key.EventId} was not found." });
 
             if (eventSeat.Status != SeatStatus.Available)
-                return Conflict(new { message = $"Seat {key.SeatId} for event {key.EventId} is not available." });
+                return Conflict(new ApiErrorResponse { Message = $"Seat {key.SeatId} for event {key.EventId} is not available." });
         }
 
         await unitOfWork.BeginTransactionAsync();
@@ -127,7 +128,7 @@ public class OrdersController(
             Guid paymentId = paymentStore.CreatePayment(order.Id, bookedSeatIds);
             cartStore.Clear(cartId);
 
-            return Ok(new { paymentId });
+            return Ok(new BookCartResponse { PaymentId = paymentId });
         }
         catch
         {
@@ -144,9 +145,9 @@ public class OrdersController(
         }
     }
 
-    private async Task<object> BuildCartStateAsync(Guid cartId, IReadOnlyCollection<CartItem> items)
+    private async Task<CartResponse> BuildCartStateAsync(Guid cartId, IReadOnlyCollection<CartItem> items)
     {
-        List<object> itemResponses = [];
+        List<CartItemResponse> itemResponses = [];
         decimal totalAmount = 0m;
 
         foreach (CartItem item in items)
@@ -160,21 +161,21 @@ public class OrdersController(
                 continue;
 
             totalAmount += eventSeat.Price;
-            itemResponses.Add(new
+            itemResponses.Add(new CartItemResponse
             {
-                eventId = item.EventId,
-                seatId = item.SeatId,
-                priceId = item.PriceId,
-                rowId = eventSeat.Seat.Row,
-                amount = eventSeat.Price
+                EventId = item.EventId,
+                SeatId = item.SeatId,
+                PriceId = item.PriceId,
+                RowId = eventSeat.Seat.Row,
+                Amount = eventSeat.Price
             });
         }
 
-        return new
+        return new CartResponse
         {
-            cartId,
-            items = itemResponses,
-            totalAmount
+            CartId = cartId,
+            Items = itemResponses,
+            TotalAmount = totalAmount
         };
     }
 

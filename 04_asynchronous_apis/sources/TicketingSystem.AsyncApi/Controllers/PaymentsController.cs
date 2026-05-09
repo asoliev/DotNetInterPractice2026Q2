@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using TicketingSystem.AsyncApi.Contracts;
+using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.AsyncApi.Services;
 using TicketingSystem.DAL.EF;
 using TicketingSystem.Domain.Entities;
@@ -13,26 +15,26 @@ namespace TicketingSystem.AsyncApi.Controllers;
 public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext dbContext) : ControllerBase
 {
     [HttpGet("{paymentId:guid}")]
-    public IActionResult GetPaymentAsync(Guid paymentId)
+    public ActionResult<PaymentResponse> GetPaymentAsync(Guid paymentId)
     {
         PaymentRecord? payment = paymentStore.Get(paymentId);
         if (payment is null)
-            return NotFound(new { message = $"Payment {paymentId} not found." });
+            return NotFound(new ApiErrorResponse { Message = $"Payment {paymentId} not found." });
 
-        return Ok(new
+        return Ok(new PaymentResponse
         {
-            paymentId = payment.Id,
-            orderId = payment.OrderId,
-            status = payment.Status.ToString()
+            PaymentId = payment.Id,
+            OrderId = payment.OrderId,
+            Status = payment.Status.ToString()
         });
     }
 
     [HttpPost("{paymentId:guid}/complete")]
-    public async Task<IActionResult> CompletePaymentAsync(Guid paymentId)
+    public async Task<ActionResult<PaymentStatusUpdateResponse>> CompletePaymentAsync(Guid paymentId)
     {
         PaymentRecord? payment = paymentStore.Get(paymentId);
         if (payment is null)
-            return NotFound(new { message = $"Payment {paymentId} not found." });
+            return NotFound(new ApiErrorResponse { Message = $"Payment {paymentId} not found." });
 
         await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync();
         try
@@ -41,7 +43,7 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
             {
                 EventSeat? eventSeat = await dbContext.EventSeats.FirstOrDefaultAsync(es => es.Id == eventSeatId);
                 if (eventSeat is null)
-                    return NotFound(new { message = $"EventSeat {eventSeatId} not found." });
+                    return NotFound(new ApiErrorResponse { Message = $"EventSeat {eventSeatId} not found." });
 
                 eventSeat.Status = SeatStatus.Sold;
             }
@@ -53,10 +55,10 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
             await dbContext.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            return Ok(new
+            return Ok(new PaymentStatusUpdateResponse
             {
-                paymentId = payment.Id,
-                status = nameof(PaymentStatus.Completed)
+                PaymentId = payment.Id,
+                Status = nameof(PaymentStatus.Completed)
             });
         }
         catch
@@ -67,11 +69,11 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
     }
 
     [HttpPost("{paymentId:guid}/failed")]
-    public async Task<IActionResult> FailPaymentAsync(Guid paymentId)
+    public async Task<ActionResult<PaymentStatusUpdateResponse>> FailPaymentAsync(Guid paymentId)
     {
         PaymentRecord? payment = paymentStore.Get(paymentId);
         if (payment is null)
-            return NotFound(new { message = $"Payment {paymentId} not found." });
+            return NotFound(new ApiErrorResponse { Message = $"Payment {paymentId} not found." });
 
         await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync();
         try
@@ -80,7 +82,7 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
             {
                 EventSeat? eventSeat = await dbContext.EventSeats.FirstOrDefaultAsync(es => es.Id == eventSeatId);
                 if (eventSeat is null)
-                    return NotFound(new { message = $"EventSeat {eventSeatId} not found." });
+                    return NotFound(new ApiErrorResponse { Message = $"EventSeat {eventSeatId} not found." });
 
                 eventSeat.Status = SeatStatus.Available;
             }
@@ -92,10 +94,10 @@ public class PaymentsController(IPaymentStore paymentStore, TicketingDbContext d
             await dbContext.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            return Ok(new
+            return Ok(new PaymentStatusUpdateResponse
             {
-                paymentId = payment.Id,
-                status = nameof(PaymentStatus.Failed)
+                PaymentId = payment.Id,
+                Status = nameof(PaymentStatus.Failed)
             });
         }
         catch

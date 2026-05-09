@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using TicketingSystem.AsyncApi.Contracts;
+using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.DAL.EF;
 
 namespace TicketingSystem.AsyncApi.Controllers;
@@ -9,16 +11,16 @@ namespace TicketingSystem.AsyncApi.Controllers;
 public class VenuesController(TicketingDbContext dbContext) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetVenuesAsync()
+    public async Task<ActionResult<IReadOnlyCollection<VenueResponse>>> GetVenuesAsync()
     {
-        var venues = await dbContext.Venues
+        List<VenueResponse> venues = await dbContext.Venues
             .AsNoTracking()
-            .Select(v => new
+            .Select(v => new VenueResponse
             {
-                id = v.Id,
-                name = v.Name,
-                address = v.Address,
-                sectionsCount = v.Sections.Count
+                Id = v.Id,
+                Name = v.Name,
+                Address = v.Address,
+                SectionsCount = v.Sections.Count
             })
             .ToListAsync();
 
@@ -26,25 +28,25 @@ public class VenuesController(TicketingDbContext dbContext) : ControllerBase
     }
 
     [HttpGet("{venueId:int}/sections")]
-    public async Task<IActionResult> GetVenueSectionsAsync(int venueId)
+    public async Task<ActionResult<IReadOnlyCollection<VenueSectionResponse>>> GetVenueSectionsAsync(int venueId)
     {
         bool venueExists = await dbContext.Venues
             .AsNoTracking()
             .AnyAsync(v => v.Id == venueId);
 
         if (!venueExists)
-            return NotFound(new { message = $"Venue {venueId} not found." });
+            return NotFound(new ApiErrorResponse { Message = $"Venue {venueId} not found." });
 
-        var sections = await dbContext.Sections
+        List<VenueSectionResponse> sections = await dbContext.Sections
             .AsNoTracking()
             .Where(s => s.VenueId == venueId)
-            .Select(s => new
+            .Select(s => new VenueSectionResponse
             {
-                id = s.Id,
-                venueId = s.VenueId,
-                name = s.Name,
-                rowCount = s.RowCount,
-                seatsPerRow = s.SeatsPerRow
+                Id = s.Id,
+                VenueId = s.VenueId,
+                Name = s.Name,
+                RowCount = s.RowCount,
+                SeatsPerRow = s.SeatsPerRow
             })
             .ToListAsync();
 
