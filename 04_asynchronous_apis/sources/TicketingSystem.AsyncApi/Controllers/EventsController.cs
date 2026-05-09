@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using TicketingSystem.AsyncApi.Contracts;
+using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.DAL.Interfaces;
 using TicketingSystem.Domain.Entities;
 
@@ -9,52 +11,53 @@ namespace TicketingSystem.AsyncApi.Controllers;
 public class EventsController(IUnitOfWork unitOfWork) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetEventsAsync()
+    public async Task<ActionResult<IReadOnlyCollection<EventResponse>>> GetEventsAsync()
     {
         IEnumerable<Event> events = await unitOfWork.Events.GetAllAsync();
 
-        var response = events
+        List<EventResponse> response = events
             .OrderBy(e => e.Date)
-            .Select(e => new
+            .Select(e => new EventResponse
             {
-                id = e.Id,
-                venueId = e.VenueId,
-                title = e.Title,
-                description = e.Description,
-                date = e.Date
-            });
+                Id = e.Id,
+                VenueId = e.VenueId,
+                Title = e.Title,
+                Description = e.Description,
+                Date = e.Date
+            })
+            .ToList();
 
         return Ok(response);
     }
 
     [HttpGet("{eventId:int}/sections/{sectionId:int}/seats")]
-    public async Task<IActionResult> GetSectionSeatsAsync(int eventId, int sectionId)
+    public async Task<ActionResult<IReadOnlyCollection<EventSeatResponse>>> GetSectionSeatsAsync(int eventId, int sectionId)
     {
         Event? eventEntity = await unitOfWork.Events.GetByIdAsync(eventId);
         if (eventEntity is null)
-            return NotFound(new { message = $"Event {eventId} not found." });
+            return NotFound(new ApiErrorResponse { Message = $"Event {eventId} not found." });
 
         IEnumerable<EventSeat> eventSeats = await unitOfWork.EventSeats.GetByEventIdAsync(eventId);
 
-        var seats = eventSeats
+        List<EventSeatResponse> seats = eventSeats
             .Where(es => es.Seat.SectionId == sectionId)
-            .Select(es => new
+            .Select(es => new EventSeatResponse
             {
-                sectionId,
-                rowId = es.Seat.Row,
-                seatId = es.SeatId,
-                status = new
+                SectionId = sectionId,
+                RowId = es.Seat.Row,
+                SeatId = es.SeatId,
+                Status = new SeatStatusResponse
                 {
-                    id = (int)es.Status,
-                    name = es.Status.ToString()
+                    Id = (int)es.Status,
+                    Name = es.Status.ToString()
                 },
-                priceOptions = new[]
+                PriceOptions = new[]
                 {
-                    new
+                    new PriceOptionResponse
                     {
-                        id = 1,
-                        name = "Standard",
-                        amount = es.Price
+                        Id = 1,
+                        Name = "Standard",
+                        Amount = es.Price
                     }
                 }
             })
