@@ -1,0 +1,5 @@
+-   Revise ‘Async Programming’ and ‘REST Architecture’ module materials from [Intermediate.NET](https://learn.epam.com/detailsPage?id=0e7ecf71-8cce-4cd8-837e-eb660e61130d) course (review, 60m)
+-   [Asynchronous Programming in .NET Core C# – using async & await](https://procodeguide.com/programming/asynchronous-programming-net-core) (reading, 30 min)
+-   [Async controllers in ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/web-api/action-return-types) (reading, 15 min)
+-   [ASP.NET Core Performance Best Practices](https://learn.microsoft.com/en-us/aspnet/core/performance/performance-best-practices) (reading, 15m)
+-   [Best Practices for Building Async APIs with ASP.NET Core](https://www.youtube.com/watch?v=_T3kvAxAPpQ) (video, 1h 30m)
