@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="TicketingSystem.IntegrationTests/TicketingSystem.IntegrationTests.csproj" />
+  <Project Path="TicketingSystem.UnitTests/TicketingSystem.UnitTests.csproj" />
+</Solution>
