@@ -38,13 +38,3 @@ export PATH="$PATH:$HOME/.dotnet/tools"
 cd 05_unit_and_integration_tests/sources
 reportgenerator -reports:"TestResultsCoverage/**/coverage.cobertura.xml" -targetdir:"CoverageReport" -reporttypes:"TextSummary;JsonSummary;Html"
 ```
-
-## Notes
-
-- Generated artifacts are ignored by git via root `.gitignore`:
-  - `**/TestResults/`
-  - `**/CoverageReport/`
-  - `**/coverage.cobertura.xml`
-  - `**/*.coverage`
-  - `**/*.coveragexml`
-  - `**/*.trx`
