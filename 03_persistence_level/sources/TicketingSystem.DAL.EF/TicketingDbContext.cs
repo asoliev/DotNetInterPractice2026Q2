@@ -14,6 +14,9 @@ public class TicketingDbContext(DbContextOptions<TicketingDbContext> options) : 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<Cart> Carts => Set<Cart>();
+    public DbSet<CartItem> CartItems => Set<CartItem>();
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -107,6 +110,41 @@ public class TicketingDbContext(DbContextOptions<TicketingDbContext> options) : 
             e.HasOne(oi => oi.EventSeat)
                 .WithOne(es => es.OrderItem)
                 .HasForeignKey<OrderItem>(oi => oi.EventSeatId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Cart
+        modelBuilder.Entity<Cart>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Id).ValueGeneratedNever();
+        });
+
+        // CartItem
+        modelBuilder.Entity<CartItem>(e =>
+        {
+            e.HasKey(ci => ci.Id);
+            e.HasIndex(ci => new { ci.CartId, ci.EventSeatId }).IsUnique();
+            e.HasOne(ci => ci.Cart)
+                .WithMany(c => c.Items)
+                .HasForeignKey(ci => ci.CartId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(ci => ci.EventSeat)
+                .WithMany(es => es.CartItems)
+                .HasForeignKey(ci => ci.EventSeatId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Payment
+        modelBuilder.Entity<Payment>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Id).ValueGeneratedNever();
+            e.Property(p => p.Status).HasConversion<int>();
+            e.HasIndex(p => p.OrderId).IsUnique();
+            e.HasOne(p => p.Order)
+                .WithOne(o => o.Payment)
+                .HasForeignKey<Payment>(p => p.OrderId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

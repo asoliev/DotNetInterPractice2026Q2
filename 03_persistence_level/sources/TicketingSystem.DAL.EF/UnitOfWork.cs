@@ -12,6 +12,8 @@ public class UnitOfWork(TicketingDbContext context) : IUnitOfWork
     private IEventSeatRepository? _eventSeats;
     private IOrderRepository? _orders;
     private ICustomerRepository? _customers;
+    private ICartRepository? _carts;
+    private IPaymentRepository? _payments;
 
     public IEventRepository Events =>
         _events ??= new EventRepository(context);
@@ -24,6 +26,12 @@ public class UnitOfWork(TicketingDbContext context) : IUnitOfWork
 
     public ICustomerRepository Customers =>
         _customers ??= new CustomerRepository(context);
+
+    public ICartRepository Carts =>
+        _carts ??= new CartRepository(context);
+
+    public IPaymentRepository Payments =>
+        _payments ??= new PaymentRepository(context);
 
     public async Task<int> SaveChangesAsync() =>
         await context.SaveChangesAsync();
