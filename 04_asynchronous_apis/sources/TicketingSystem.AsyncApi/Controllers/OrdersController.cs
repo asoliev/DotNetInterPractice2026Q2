@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.DAL.Interfaces;
@@ -10,7 +11,8 @@ namespace TicketingSystem.AsyncApi.Controllers;
 [ApiController]
 [Route("orders/carts/{cartId:guid}")]
 public class OrdersController(
-    IUnitOfWork unitOfWork) : ControllerBase
+    IUnitOfWork unitOfWork,
+    IEventResourceCache eventResourceCache) : ControllerBase
 {
     [HttpGet("")]
     public async Task<ActionResult<CartResponse>> GetCartAsync(Guid cartId)
@@ -50,6 +52,8 @@ public class OrdersController(
         Cart? persistedCart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
         if (persistedCart is null)
             return NotFound(new ApiErrorResponse { Message = $"Cart {cartId} not found." });
+
+        eventResourceCache.Invalidate();
 
         CartResponse state = BuildCartState(persistedCart);
         return Ok(state);
@@ -137,6 +141,8 @@ public class OrdersController(
 
             await unitOfWork.SaveChangesAsync();
             await unitOfWork.CommitTransactionAsync();
+
+            eventResourceCache.Invalidate();
 
             return Ok(new BookCartResponse { PaymentId = payment.Id });
         }

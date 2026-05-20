@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.DAL.Interfaces;
@@ -8,24 +9,29 @@ namespace TicketingSystem.AsyncApi.Controllers;
 
 [ApiController]
 [Route("events")]
-public class EventsController(IUnitOfWork unitOfWork) : ControllerBase
+public class EventsController(
+    IUnitOfWork unitOfWork,
+    IEventResourceCache eventResourceCache) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<EventResponse>>> GetEventsAsync()
     {
-        IEnumerable<Event> events = await unitOfWork.Events.GetAllAsync();
+        IReadOnlyCollection<EventResponse> response = await eventResourceCache.GetEventsAsync(async () =>
+        {
+            IEnumerable<Event> events = await unitOfWork.Events.GetAllAsync();
 
-        List<EventResponse> response = events
-            .OrderBy(e => e.Date)
-            .Select(e => new EventResponse
-            {
-                Id = e.Id,
-                VenueId = e.VenueId,
-                Title = e.Title,
-                Description = e.Description,
-                Date = e.Date
-            })
-            .ToList();
+            return events
+                .OrderBy(e => e.Date)
+                .Select(e => new EventResponse
+                {
+                    Id = e.Id,
+                    VenueId = e.VenueId,
+                    Title = e.Title,
+                    Description = e.Description,
+                    Date = e.Date
+                })
+                .ToList();
+        });
 
         return Ok(response);
     }
@@ -37,31 +43,35 @@ public class EventsController(IUnitOfWork unitOfWork) : ControllerBase
         if (eventEntity is null)
             return NotFound(new ApiErrorResponse { Message = $"Event {eventId} not found." });
 
-        IEnumerable<EventSeat> eventSeats = await unitOfWork.EventSeats.GetByEventIdAsync(eventId);
-
-        List<EventSeatResponse> seats = eventSeats
-            .Where(es => es.Seat.SectionId == sectionId)
-            .Select(es => new EventSeatResponse
+        IReadOnlyCollection<EventSeatResponse> seats = await eventResourceCache.GetSectionSeatsAsync(eventId, sectionId,
+            async () =>
             {
-                SectionId = sectionId,
-                RowId = es.Seat.Row,
-                SeatId = es.SeatId,
-                Status = new SeatStatusResponse
-                {
-                    Id = (int)es.Status,
-                    Name = es.Status.ToString()
-                },
-                PriceOptions = new[]
-                {
-                    new PriceOptionResponse
+                IEnumerable<EventSeat> eventSeats = await unitOfWork.EventSeats.GetByEventIdAsync(eventId);
+
+                return eventSeats
+                    .Where(es => es.Seat.SectionId == sectionId)
+                    .Select(es => new EventSeatResponse
                     {
-                        Id = 1,
-                        Name = "Standard",
-                        Amount = es.Price
-                    }
-                }
-            })
-            .ToList();
+                        SectionId = sectionId,
+                        RowId = es.Seat.Row,
+                        SeatId = es.SeatId,
+                        Status = new SeatStatusResponse
+                        {
+                            Id = (int)es.Status,
+                            Name = es.Status.ToString()
+                        },
+                        PriceOptions = new[]
+                        {
+                            new PriceOptionResponse
+                            {
+                                Id = 1,
+                                Name = "Standard",
+                                Amount = es.Price
+                            }
+                        }
+                    })
+                    .ToList();
+            });
 
         return Ok(seats);
     }

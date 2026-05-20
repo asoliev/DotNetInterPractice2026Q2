@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TicketingSystem.AsyncApi;
+using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.DAL.EF;
 using TicketingSystem.DAL.Interfaces;
 
@@ -15,6 +16,8 @@ builder.Services.AddDbContext<TicketingDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<IEventResourceCache, EventResourceCache>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
