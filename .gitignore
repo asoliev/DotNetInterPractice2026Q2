@@ -100,3 +100,6 @@ Platforms/Windows/bin/
 # Other
 *.db
 *.sqlite
+
+# Local dotnet CLI home created for sandboxed builds
+.dotnet-cli-home/
