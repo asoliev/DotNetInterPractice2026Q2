@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.Headers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using TicketingSystem.AsyncApi.Caching;
@@ -42,7 +43,7 @@ public class EventsController(
                 .ToList();
         });
 
-            ApplyHttpCacheHeaders(Response, metadata);
+        ApplyHttpCacheHeaders(Response, metadata);
         return Ok(response);
     }
 
@@ -66,7 +67,7 @@ public class EventsController(
             {
                 IEnumerable<EventSeat> eventSeats = await unitOfWork.EventSeats.GetByEventIdAsync(eventId);
 
-                return eventSeats
+                return [.. eventSeats
                     .Where(es => es.Seat.SectionId == sectionId)
                     .Select(es => new EventSeatResponse
                     {
@@ -87,8 +88,7 @@ public class EventsController(
                                 Amount = es.Price
                             }
                         }
-                    })
-                    .ToList();
+                    })];
             });
 
         ApplyHttpCacheHeaders(Response, metadata);
@@ -97,7 +97,7 @@ public class EventsController(
 
     private static bool IsClientCacheValid(HttpRequest request, EventCacheMetadata metadata)
     {
-        var requestHeaders = request.GetTypedHeaders();
+        RequestHeaders requestHeaders = request.GetTypedHeaders();
 
         if (requestHeaders.IfNoneMatch is { Count: > 0 })
         {
@@ -120,7 +120,7 @@ public class EventsController(
 
     private static void ApplyHttpCacheHeaders(HttpResponse response, EventCacheMetadata metadata)
     {
-        var responseHeaders = response.GetTypedHeaders();
+        ResponseHeaders responseHeaders = response.GetTypedHeaders();
         responseHeaders.CacheControl = new CacheControlHeaderValue
         {
             Public = true,
