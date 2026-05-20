@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
@@ -16,6 +17,14 @@ public class EventsController(
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<EventResponse>>> GetEventsAsync()
     {
+        const string resourceKey = EventResourceCache.EventsListResourceKey;
+        EventCacheMetadata metadata = eventResourceCache.GetMetadata(resourceKey);
+        if (IsClientCacheValid(Request, metadata))
+        {
+            ApplyHttpCacheHeaders(Response, metadata);
+            return StatusCode(StatusCodes.Status304NotModified);
+        }
+
         IReadOnlyCollection<EventResponse> response = await eventResourceCache.GetEventsAsync(async () =>
         {
             IEnumerable<Event> events = await unitOfWork.Events.GetAllAsync();
@@ -33,12 +42,21 @@ public class EventsController(
                 .ToList();
         });
 
+            ApplyHttpCacheHeaders(Response, metadata);
         return Ok(response);
     }
 
     [HttpGet("{eventId:int}/sections/{sectionId:int}/seats")]
     public async Task<ActionResult<IReadOnlyCollection<EventSeatResponse>>> GetSectionSeatsAsync(int eventId, int sectionId)
     {
+        string resourceKey = EventResourceCache.BuildSectionSeatsResourceKey(eventId, sectionId);
+        EventCacheMetadata metadata = eventResourceCache.GetMetadata(resourceKey);
+        if (IsClientCacheValid(Request, metadata))
+        {
+            ApplyHttpCacheHeaders(Response, metadata);
+            return StatusCode(StatusCodes.Status304NotModified);
+        }
+
         Event? eventEntity = await unitOfWork.Events.GetByIdAsync(eventId);
         if (eventEntity is null)
             return NotFound(new ApiErrorResponse { Message = $"Event {eventId} not found." });
@@ -73,6 +91,45 @@ public class EventsController(
                     .ToList();
             });
 
+        ApplyHttpCacheHeaders(Response, metadata);
         return Ok(seats);
+    }
+
+    private static bool IsClientCacheValid(HttpRequest request, EventCacheMetadata metadata)
+    {
+        var requestHeaders = request.GetTypedHeaders();
+
+        if (requestHeaders.IfNoneMatch is { Count: > 0 })
+        {
+            bool etagMatches = requestHeaders.IfNoneMatch.Any(tag =>
+                tag.Tag == "*" ||
+                string.Equals(tag.Tag.Value, metadata.ETag.Tag.Value, StringComparison.Ordinal));
+
+            if (etagMatches)
+                return true;
+        }
+
+        if (requestHeaders.IfModifiedSince is DateTimeOffset ifModifiedSince)
+        {
+            if (metadata.LastModified <= ifModifiedSince)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void ApplyHttpCacheHeaders(HttpResponse response, EventCacheMetadata metadata)
+    {
+        var responseHeaders = response.GetTypedHeaders();
+        responseHeaders.CacheControl = new CacheControlHeaderValue
+        {
+            Public = true,
+            MaxAge = TimeSpan.FromSeconds(30),
+            MustRevalidate = true
+        };
+        responseHeaders.ETag = metadata.ETag;
+        responseHeaders.LastModified = metadata.LastModified;
+        responseHeaders.Expires = metadata.LastModified.AddSeconds(30);
+        response.Headers.Vary = "Accept";
     }
 }
