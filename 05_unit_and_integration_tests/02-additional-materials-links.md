@@ -1,0 +1,5 @@
+-   [Test automation basics](https://learn.epam.com/detailsPage?id=f56d0238-379b-41fc-a95d-1edf82d251d6)    
+-   [Automated tests categories](https://martinfowler.com/tags/test%20categories.html)
+-   [The Practical Test Pyramid](https://martinfowler.com/articles/practical-test-pyramid.html)
+-   [Load testing with Jmeter](https://www.linkedin.com/learning/jmeter-performance-and-load-testing/testing-with-jmeter)
+-   [Shims](https://learn.microsoft.com/en-us/visualstudio/test/using-shims-to-isolate-your-application-from-other-assemblies-for-unit-testing?view=vs-2022&tabs=csharp)

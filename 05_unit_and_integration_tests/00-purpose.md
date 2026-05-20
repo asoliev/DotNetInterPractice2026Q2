@@ -1,0 +1,2 @@
+The goal of this module to familiarize yourself with different types, models of automated tests and code coverage tools.
+Practical tasks aim to achieve effective coverage of a system with automated tests.

@@ -55,6 +55,12 @@ _ReSharper*/
 # Local test results
 TestResults/
 CoverageReport/
+**/TestResults/
+**/CoverageReport/
+**/coverage.cobertura.xml
+**/*.coverage
+**/*.coveragexml
+**/*.trx
 
 # ASP.NET Core specific
 appsettings.Development.json
