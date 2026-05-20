@@ -1,0 +1,4 @@
+-   Review/Refresh ‘Multithreading in .NET’ module materials from [Intermediate.NET](https://learn.epam.com/detailsPage?id=0e7ecf71-8cce-4cd8-837e-eb660e61130d) course (review, 2h)
+-   [Overview of caching in ASP.NET](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/overview) (30m)
+-   [Cache Invalidation Strategies](https://en.wikipedia.org/wiki/Cache_invalidation)
+-   [Threading objects and features](https://learn.microsoft.com/en-us/dotnet/standard/threading/threading-objects-and-features)

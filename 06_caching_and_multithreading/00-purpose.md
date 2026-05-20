@@ -1,0 +1,1 @@
+The purpose of the module is to consolidate in practice the materials on ‘Multithreading’ topics with a focus on data access synchronization options on the example of caching logic implementation in a multithreaded ASP.NET API. In addition, you will learn about cache invalidation strategies.
