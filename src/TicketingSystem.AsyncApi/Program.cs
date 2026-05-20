@@ -9,7 +9,6 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 string dbPath = Path.GetFullPath(Path.Combine(
     builder.Environment.ContentRootPath,
-    "..",
     "ticketing.asyncapi.db"));
 
 builder.Services.AddDbContext<TicketingDbContext>(options =>

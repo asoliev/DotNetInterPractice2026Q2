@@ -9,24 +9,24 @@ This report covers implementation from `03-home-task.md`:
 
 ### 1) Server-side Event Caching (Task 1)
 Implemented in-memory cache service:
-- File: `04_asynchronous_apis/sources/TicketingSystem.AsyncApi/Caching/EventResourceCache.cs`
+- File: `src/TicketingSystem.AsyncApi/Caching/EventResourceCache.cs`
 - Added API:
   - `GetEventsAsync(...)`
   - `GetSectionSeatsAsync(...)`
   - `Invalidate()`
 
 Registered cache in DI:
-- File: `04_asynchronous_apis/sources/TicketingSystem.AsyncApi/Program.cs`
+- File: `src/TicketingSystem.AsyncApi/Program.cs`
 - Added:
   - `AddMemoryCache()`
   - `AddSingleton<IEventResourceCache, EventResourceCache>()`
 
 Used cache in Event endpoints:
-- File: `04_asynchronous_apis/sources/TicketingSystem.AsyncApi/Controllers/EventsController.cs`
+- File: `src/TicketingSystem.AsyncApi/Controllers/EventsController.cs`
 - `/events` and `/events/{eventId}/sections/{sectionId}/seats` now read via cache service.
 
 ### 2) Cache Invalidation on Order POST/PUT (Task 1)
-- File: `04_asynchronous_apis/sources/TicketingSystem.AsyncApi/Controllers/OrdersController.cs`
+- File: `src/TicketingSystem.AsyncApi/Controllers/OrdersController.cs`
 - Invalidate Event cache after successful:
   - `POST /orders/carts/{cartId}` (add seat)
   - `PUT /orders/carts/{cartId}/book` (book cart)
@@ -34,7 +34,7 @@ Used cache in Event endpoints:
 `DELETE /orders/carts/{cartId}/events/{eventId}/seats/{seatId}` was intentionally left unchanged per task requirement.
 
 ### 3) HTTP Request Caching for Event Endpoints (Task 2)
-- File: `04_asynchronous_apis/sources/TicketingSystem.AsyncApi/Controllers/EventsController.cs`
+- File: `src/TicketingSystem.AsyncApi/Controllers/EventsController.cs`
 - Added response headers:
   - `Cache-Control: public, max-age=30, must-revalidate`
   - `ETag`
@@ -45,7 +45,7 @@ Used cache in Event endpoints:
   - If `If-None-Match` or `If-Modified-Since` matches current metadata -> `304 Not Modified`.
 
 ### 4) Integration Tests for Caching
-- File: `05_unit_and_integration_tests/sources/TicketingSystem.IntegrationTests/EventCachingIntegrationTests.cs`
+- File: `src/TicketingSystem.IntegrationTests/EventCachingIntegrationTests.cs`
 - Covered cases:
   - `GET /events` returns cache headers and `304` for matching ETag.
   - `GET /events/{eventId}/sections/{sectionId}/seats` returns cache headers and `304` for matching ETag.
@@ -54,7 +54,7 @@ Used cache in Event endpoints:
 
 ## Validation
 Build command used:
-- `dotnet build 04_asynchronous_apis/sources/TicketingSystem.AsyncApi.slnx`
+- `dotnet build src/TicketingSystem.slnx`
 
 Result:
 - Build succeeded for Async API and referenced projects.

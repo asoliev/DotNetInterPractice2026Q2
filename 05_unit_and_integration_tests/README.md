@@ -7,9 +7,9 @@ This module contains automated tests for the Ticketing System:
 
 ## Structure
 
-- `sources/TicketingSystem.Tests.slnx` - test solution
-- `sources/TicketingSystem.UnitTests/` - unit tests
-- `sources/TicketingSystem.IntegrationTests/` - integration tests
+- `src/TicketingSystem.slnx` - workspace solution
+- `src/TicketingSystem.UnitTests/` - unit tests
+- `src/TicketingSystem.IntegrationTests/` - integration tests
 
 ## Prerequisites
 
@@ -20,21 +20,19 @@ This module contains automated tests for the Ticketing System:
 From repository root:
 
 ```bash
-cd 05_unit_and_integration_tests/sources
-dotnet test TicketingSystem.Tests.slnx
+dotnet test src/TicketingSystem.slnx
 ```
 
 ## Run tests with coverage
 
 ```bash
-cd 05_unit_and_integration_tests/sources
-dotnet test TicketingSystem.Tests.slnx --collect:"XPlat Code Coverage" --results-directory ./TestResultsCoverage
+dotnet test src/TicketingSystem.slnx --collect:"XPlat Code Coverage" --results-directory ./TestResultsCoverage
 ```
 
 To generate a readable summary report (optional):
 
 ```bash
 export PATH="$PATH:$HOME/.dotnet/tools"
-cd 05_unit_and_integration_tests/sources
+dotnet test src/TicketingSystem.slnx --collect:"XPlat Code Coverage" --results-directory ./TestResultsCoverage
 reportgenerator -reports:"TestResultsCoverage/**/coverage.cobertura.xml" -targetdir:"CoverageReport" -reporttypes:"TextSummary;JsonSummary;Html"
 ```

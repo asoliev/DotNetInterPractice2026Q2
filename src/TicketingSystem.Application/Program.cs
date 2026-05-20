@@ -28,8 +28,16 @@ static async Task RunDemoAsync()
 		File.AppendAllText(logPath, line + Environment.NewLine);
 	};
 
+	string dbPath = Path.GetFullPath(Path.Combine(
+		AppContext.BaseDirectory,
+		"..",
+		"..",
+		"..",
+		"..",
+		"ticketing.db"));
+
 	DbContextOptions<TicketingDbContext> options = new DbContextOptionsBuilder<TicketingDbContext>()
-		.UseSqlite("Data Source=ticketing.db")
+		.UseSqlite($"Data Source={dbPath}")
 		.LogTo(queryLogger, LogLevel.Information)
 		.EnableDetailedErrors()
 		.Options;

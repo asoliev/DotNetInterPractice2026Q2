@@ -18,7 +18,7 @@ This PR introduces comprehensive unit and integration test coverage for the Tick
   - **Integration Tests:** 13 tests across 2 test suites
     - TicketOrderingIntegrationTests (10 tests): Cart operations, booking, payment flows
     - VenuesControllerIntegrationTests (3 tests): Venue and section retrieval
-- `TicketingSystem.Tests.slnx`: Unified solution file for test projects
+- `src/TicketingSystem.slnx`: Unified solution file for the workspace projects
 - `README.md`: Setup and coverage generation instructions
 - `04-self-check-questions.md`: Answered learning assessment (7 questions)
 

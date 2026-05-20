@@ -6,3 +6,12 @@
 4. [Module 4: Asynchronous ASP.NET Core APIs](./04_asynchronous_apis/)
 5. [Module 5: Unit and Integration testing](./05_unit_and_integration_tests/)
 6. [Module 6: Caching and Multithreading](./06_caching_and_multithreading/)
+
+## Workspace Solution
+
+Build and test the full workspace from the repo root with:
+
+```bash
+dotnet build src/TicketingSystem.slnx
+dotnet test src/TicketingSystem.slnx
+```

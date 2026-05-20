@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="TicketingSystem.Application/TicketingSystem.Application.csproj" />
+  <Project Path="TicketingSystem.DAL.EF/TicketingSystem.DAL.EF.csproj" />
+  <Project Path="TicketingSystem.DAL/TicketingSystem.DAL.csproj" />
+  <Project Path="TicketingSystem.Domain/TicketingSystem.Domain.csproj" />
+  <Project Path="TicketingSystem.AsyncApi/TicketingSystem.AsyncApi.csproj" />
+  <Project Path="TicketingSystem.IntegrationTests/TicketingSystem.IntegrationTests.csproj" />
+  <Project Path="TicketingSystem.UnitTests/TicketingSystem.UnitTests.csproj" />
+</Solution>

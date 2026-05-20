@@ -25,7 +25,7 @@ The API references these projects from module 03:
 
 ## Database
 
-- SQLite file used by API: `04_asynchronous_apis/sources/ticketing.asyncapi.db`
+- SQLite file used by API: `src/ticketing.asyncapi.db`
 - Connection is configured in `Program.cs`
 - On startup, `SeedData.InitializeAsync(...)` applies EF migrations and then seeds demo data if empty.
 
@@ -34,8 +34,8 @@ The API references these projects from module 03:
 From repository root:
 
 ```bash
-dotnet build 04_asynchronous_apis/sources/TicketingSystem.AsyncApi.slnx
-dotnet run --project 04_asynchronous_apis/sources/TicketingSystem.AsyncApi/TicketingSystem.AsyncApi.csproj --urls http://localhost:5188
+dotnet build src/TicketingSystem.slnx
+dotnet run --project src/TicketingSystem.AsyncApi/TicketingSystem.AsyncApi.csproj --urls http://localhost:5188
 ```
 
 ## Swagger UI
