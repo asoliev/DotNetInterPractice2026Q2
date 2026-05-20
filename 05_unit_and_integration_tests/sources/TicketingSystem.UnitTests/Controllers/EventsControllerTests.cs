@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using Moq;
+using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.AsyncApi.Controllers;
 using TicketingSystem.DAL.Interfaces;
@@ -13,11 +15,28 @@ public class EventsControllerTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IEventRepository> _eventRepoMock = new();
     private readonly Mock<IEventSeatRepository> _eventSeatRepoMock = new();
+    private readonly Mock<IEventResourceCache> _eventResourceCacheMock = new();
 
     public EventsControllerTests()
     {
         _unitOfWorkMock.Setup(u => u.Events).Returns(_eventRepoMock.Object);
         _unitOfWorkMock.Setup(u => u.EventSeats).Returns(_eventSeatRepoMock.Object);
+
+        _eventResourceCacheMock
+            .Setup(c => c.GetMetadata(It.IsAny<string>()))
+            .Returns(new EventCacheMetadata(new EntityTagHeaderValue("\"test\""), DateTimeOffset.UtcNow));
+
+        _eventResourceCacheMock
+            .Setup(c => c.GetEventsAsync(It.IsAny<Func<Task<IReadOnlyCollection<EventResponse>>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<IReadOnlyCollection<EventResponse>>> factory, CancellationToken _) => factory());
+
+        _eventResourceCacheMock
+            .Setup(c => c.GetSectionSeatsAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<Func<Task<IReadOnlyCollection<EventSeatResponse>>>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((int _, int _, Func<Task<IReadOnlyCollection<EventSeatResponse>>> factory, CancellationToken _) => factory());
     }
 
     [Fact]
@@ -31,7 +50,7 @@ public class EventsControllerTests
         };
         _eventRepoMock.Setup(r => r.GetAllAsync()).ReturnsAsync(events);
 
-        var controller = new EventsController(_unitOfWorkMock.Object);
+        var controller = new EventsController(_unitOfWorkMock.Object, _eventResourceCacheMock.Object);
 
         // Act
         var result = await controller.GetEventsAsync();
@@ -48,7 +67,7 @@ public class EventsControllerTests
     {
         // Arrange
         _eventRepoMock.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((Event?)null);
-        var controller = new EventsController(_unitOfWorkMock.Object);
+        var controller = new EventsController(_unitOfWorkMock.Object, _eventResourceCacheMock.Object);
 
         // Act
         var result = await controller.GetSectionSeatsAsync(99, 1);
@@ -77,7 +96,7 @@ public class EventsControllerTests
         _eventRepoMock.Setup(r => r.GetByIdAsync(eventId)).ReturnsAsync(new Event { Id = eventId });
         _eventSeatRepoMock.Setup(r => r.GetByEventIdAsync(eventId)).ReturnsAsync(eventSeats);
 
-        var controller = new EventsController(_unitOfWorkMock.Object);
+        var controller = new EventsController(_unitOfWorkMock.Object, _eventResourceCacheMock.Object);
 
         // Act
         var result = await controller.GetSectionSeatsAsync(eventId, sectionId);

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Moq;
+using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.AsyncApi.Controllers;
@@ -17,6 +18,7 @@ public class OrdersControllerTests
     private readonly Mock<IOrderRepository> _orderRepoMock = new();
     private readonly Mock<ICustomerRepository> _customerRepoMock = new();
     private readonly Mock<IPaymentRepository> _paymentRepoMock = new();
+    private readonly Mock<IEventResourceCache> _eventResourceCacheMock = new();
 
     public OrdersControllerTests()
     {
@@ -31,7 +33,7 @@ public class OrdersControllerTests
         _unitOfWorkMock.Setup(u => u.RollbackTransactionAsync()).Returns(Task.CompletedTask);
     }
 
-    private OrdersController CreateController() => new(_unitOfWorkMock.Object);
+    private OrdersController CreateController() => new(_unitOfWorkMock.Object, _eventResourceCacheMock.Object);
 
     // ── GetCartAsync ─────────────────────────────────────────────────────────
 
