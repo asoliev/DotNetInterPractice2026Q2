@@ -103,3 +103,7 @@ Platforms/Windows/bin/
 
 # Local dotnet CLI home created for sandboxed builds
 .dotnet-cli-home/
+
+# Local Microsoft DeveloperTools machine metadata
+Library/Application\ Support/Microsoft/DeveloperTools/
+**/Library/Application\ Support/Microsoft/DeveloperTools/
