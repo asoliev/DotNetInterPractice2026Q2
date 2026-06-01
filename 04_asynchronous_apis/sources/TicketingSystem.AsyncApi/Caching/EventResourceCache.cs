@@ -37,10 +37,10 @@ public sealed class EventResourceCache(IMemoryCache memoryCache) : IEventResourc
         await _gate.WaitAsync(cancellationToken);
         try
         {
-        cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
-        string cacheKey = BuildCacheKey(EventsListResourceKey);
-        _trackedCacheKeys.TryAdd(cacheKey, 0);
+            string cacheKey = BuildCacheKey(EventsListResourceKey);
+            _trackedCacheKeys.TryAdd(cacheKey, 0);
 
             return (await memoryCache.GetOrCreateAsync(cacheKey, async entry =>
             {
@@ -64,11 +64,11 @@ public sealed class EventResourceCache(IMemoryCache memoryCache) : IEventResourc
         await _gate.WaitAsync(cancellationToken);
         try
         {
-        cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
-        string resourceKey = BuildSectionSeatsResourceKey(eventId, sectionId);
-        string cacheKey = BuildCacheKey(resourceKey);
-        _trackedCacheKeys.TryAdd(cacheKey, 0);
+            string resourceKey = BuildSectionSeatsResourceKey(eventId, sectionId);
+            string cacheKey = BuildCacheKey(resourceKey);
+            _trackedCacheKeys.TryAdd(cacheKey, 0);
 
             return (await memoryCache.GetOrCreateAsync(cacheKey, async entry =>
             {
@@ -88,12 +88,12 @@ public sealed class EventResourceCache(IMemoryCache memoryCache) : IEventResourc
         _gate.Wait();
         try
         {
-        long version = Interlocked.Read(ref _version);
-        long ticks = Interlocked.Read(ref _lastModifiedTicks);
-        DateTimeOffset lastModified = new(ticks, TimeSpan.Zero);
-        string etagValue = $"\"{version}-{Math.Abs(resourceKey.GetHashCode(StringComparison.Ordinal))}\"";
+            long version = Interlocked.Read(ref _version);
+            long ticks = Interlocked.Read(ref _lastModifiedTicks);
+            DateTimeOffset lastModified = new(ticks, TimeSpan.Zero);
+            string etagValue = $"\"{version}-{Math.Abs(resourceKey.GetHashCode(StringComparison.Ordinal))}\"";
 
-        return new EventCacheMetadata(EntityTagHeaderValue.Parse(etagValue), lastModified);
+            return new EventCacheMetadata(EntityTagHeaderValue.Parse(etagValue), lastModified);
         }
         finally
         {
@@ -106,15 +106,15 @@ public sealed class EventResourceCache(IMemoryCache memoryCache) : IEventResourc
         _gate.Wait();
         try
         {
-        Interlocked.Increment(ref _version);
-        Interlocked.Exchange(ref _lastModifiedTicks, DateTimeOffset.UtcNow.Ticks);
+            Interlocked.Increment(ref _version);
+            Interlocked.Exchange(ref _lastModifiedTicks, DateTimeOffset.UtcNow.Ticks);
 
-        foreach (string key in _trackedCacheKeys.Keys)
-        {
-            memoryCache.Remove(key);
-        }
+            foreach (string key in _trackedCacheKeys.Keys)
+            {
+                memoryCache.Remove(key);
+            }
 
-        _trackedCacheKeys.Clear();
+            _trackedCacheKeys.Clear();
         }
         finally
         {
