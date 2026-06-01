@@ -26,58 +26,86 @@ public sealed class EventResourceCache(IMemoryCache memoryCache) : IEventResourc
     public const string EventsListResourceKey = "events:list";
 
     private readonly ConcurrentDictionary<string, byte> _trackedCacheKeys = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _gate = new(1, 1);
     private long _version = 1;
     private long _lastModifiedTicks = DateTimeOffset.UtcNow.Ticks;
 
-    public Task<IReadOnlyCollection<EventResponse>> GetEventsAsync(
+    public async Task<IReadOnlyCollection<EventResponse>> GetEventsAsync(
         Func<CancellationToken, Task<IReadOnlyCollection<EventResponse>>> factory,
         CancellationToken cancellationToken = default)
     {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
         cancellationToken.ThrowIfCancellationRequested();
 
         string cacheKey = BuildCacheKey(EventsListResourceKey);
         _trackedCacheKeys.TryAdd(cacheKey, 0);
 
-        return memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+            return (await memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                return await factory(cancellationToken);
+            }))!;
+        }
+        finally
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
-            return await factory(cancellationToken);
-        })!;
+            _gate.Release();
+        }
     }
 
-    public Task<IReadOnlyCollection<EventSeatResponse>> GetSectionSeatsAsync(
+    public async Task<IReadOnlyCollection<EventSeatResponse>> GetSectionSeatsAsync(
         int eventId,
         int sectionId,
         Func<CancellationToken, Task<IReadOnlyCollection<EventSeatResponse>>> factory,
         CancellationToken cancellationToken = default)
     {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
         cancellationToken.ThrowIfCancellationRequested();
 
         string resourceKey = BuildSectionSeatsResourceKey(eventId, sectionId);
         string cacheKey = BuildCacheKey(resourceKey);
         _trackedCacheKeys.TryAdd(cacheKey, 0);
 
-        return memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+            return (await memoryCache.GetOrCreateAsync(cacheKey, async entry =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                return await factory(cancellationToken);
+            }))!;
+        }
+        finally
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
-            return await factory(cancellationToken);
-        })!;
+            _gate.Release();
+        }
     }
 
     public EventCacheMetadata GetMetadata(string resourceKey)
     {
+        _gate.Wait();
+        try
+        {
         long version = Interlocked.Read(ref _version);
         long ticks = Interlocked.Read(ref _lastModifiedTicks);
         DateTimeOffset lastModified = new(ticks, TimeSpan.Zero);
         string etagValue = $"\"{version}-{Math.Abs(resourceKey.GetHashCode(StringComparison.Ordinal))}\"";
 
         return new EventCacheMetadata(EntityTagHeaderValue.Parse(etagValue), lastModified);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public void Invalidate()
     {
+        _gate.Wait();
+        try
+        {
         Interlocked.Increment(ref _version);
         Interlocked.Exchange(ref _lastModifiedTicks, DateTimeOffset.UtcNow.Ticks);
 
@@ -87,6 +115,11 @@ public sealed class EventResourceCache(IMemoryCache memoryCache) : IEventResourc
         }
 
         _trackedCacheKeys.Clear();
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public static string BuildSectionSeatsResourceKey(int eventId, int sectionId) =>
