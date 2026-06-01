@@ -16,7 +16,7 @@ public class EventsController(
     IEventResourceCache eventResourceCache) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyCollection<EventResponse>>> GetEventsAsync()
+    public async Task<ActionResult<IReadOnlyCollection<EventResponse>>> GetEventsAsync(CancellationToken cancellationToken = default)
     {
         const string resourceKey = EventResourceCache.EventsListResourceKey;
         EventCacheMetadata metadata = eventResourceCache.GetMetadata(resourceKey);
@@ -26,11 +26,11 @@ public class EventsController(
             return StatusCode(StatusCodes.Status304NotModified);
         }
 
-        IReadOnlyCollection<EventResponse> response = await eventResourceCache.GetEventsAsync(async () =>
+        IReadOnlyCollection<EventResponse> response = await eventResourceCache.GetEventsAsync(async _ =>
         {
             IEnumerable<Event> events = await unitOfWork.Events.GetAllAsync();
 
-            return events
+            IReadOnlyCollection<EventResponse> value = [.. events
                 .OrderBy(e => e.Date)
                 .Select(e => new EventResponse
                 {
@@ -39,16 +39,16 @@ public class EventsController(
                     Title = e.Title,
                     Description = e.Description,
                     Date = e.Date
-                })
-                .ToList();
-        });
+                })];
+            return value;
+        }, cancellationToken);
 
         ApplyHttpCacheHeaders(Response, metadata);
         return Ok(response);
     }
 
     [HttpGet("{eventId:int}/sections/{sectionId:int}/seats")]
-    public async Task<ActionResult<IReadOnlyCollection<EventSeatResponse>>> GetSectionSeatsAsync(int eventId, int sectionId)
+    public async Task<ActionResult<IReadOnlyCollection<EventSeatResponse>>> GetSectionSeatsAsync(int eventId, int sectionId, CancellationToken cancellationToken = default)
     {
         string resourceKey = EventResourceCache.BuildSectionSeatsResourceKey(eventId, sectionId);
         EventCacheMetadata metadata = eventResourceCache.GetMetadata(resourceKey);
@@ -63,11 +63,11 @@ public class EventsController(
             return NotFound(new ApiErrorResponse { Message = $"Event {eventId} not found." });
 
         IReadOnlyCollection<EventSeatResponse> seats = await eventResourceCache.GetSectionSeatsAsync(eventId, sectionId,
-            async () =>
+            async _ =>
             {
                 IEnumerable<EventSeat> eventSeats = await unitOfWork.EventSeats.GetByEventIdAsync(eventId);
 
-                return [.. eventSeats
+                IReadOnlyCollection<EventSeatResponse> value = [.. eventSeats
                     .Where(es => es.Seat.SectionId == sectionId)
                     .Select(es => new EventSeatResponse
                     {
@@ -89,7 +89,8 @@ public class EventsController(
                             }
                         }
                     })];
-            });
+                return value;
+            }, cancellationToken);
 
         ApplyHttpCacheHeaders(Response, metadata);
         return Ok(seats);

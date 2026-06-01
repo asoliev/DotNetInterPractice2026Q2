@@ -8,13 +8,13 @@ namespace TicketingSystem.AsyncApi.Caching;
 public interface IEventResourceCache
 {
     Task<IReadOnlyCollection<EventResponse>> GetEventsAsync(
-        Func<Task<IReadOnlyCollection<EventResponse>>> factory,
+        Func<CancellationToken, Task<IReadOnlyCollection<EventResponse>>> factory,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<EventSeatResponse>> GetSectionSeatsAsync(
         int eventId,
         int sectionId,
-        Func<Task<IReadOnlyCollection<EventSeatResponse>>> factory,
+        Func<CancellationToken, Task<IReadOnlyCollection<EventSeatResponse>>> factory,
         CancellationToken cancellationToken = default);
 
     EventCacheMetadata GetMetadata(string resourceKey);
@@ -30,33 +30,39 @@ public sealed class EventResourceCache(IMemoryCache memoryCache) : IEventResourc
     private long _lastModifiedTicks = DateTimeOffset.UtcNow.Ticks;
 
     public Task<IReadOnlyCollection<EventResponse>> GetEventsAsync(
-        Func<Task<IReadOnlyCollection<EventResponse>>> factory,
+        Func<CancellationToken, Task<IReadOnlyCollection<EventResponse>>> factory,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         string cacheKey = BuildCacheKey(EventsListResourceKey);
         _trackedCacheKeys.TryAdd(cacheKey, 0);
 
         return memoryCache.GetOrCreateAsync(cacheKey, async entry =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
-            return await factory();
+            return await factory(cancellationToken);
         })!;
     }
 
     public Task<IReadOnlyCollection<EventSeatResponse>> GetSectionSeatsAsync(
         int eventId,
         int sectionId,
-        Func<Task<IReadOnlyCollection<EventSeatResponse>>> factory,
+        Func<CancellationToken, Task<IReadOnlyCollection<EventSeatResponse>>> factory,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         string resourceKey = BuildSectionSeatsResourceKey(eventId, sectionId);
         string cacheKey = BuildCacheKey(resourceKey);
         _trackedCacheKeys.TryAdd(cacheKey, 0);
 
         return memoryCache.GetOrCreateAsync(cacheKey, async entry =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
-            return await factory();
+            return await factory(cancellationToken);
         })!;
     }
 
