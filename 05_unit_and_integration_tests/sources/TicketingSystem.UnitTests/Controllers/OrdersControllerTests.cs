@@ -19,6 +19,7 @@ public class OrdersControllerTests
     private readonly Mock<ICustomerRepository> _customerRepoMock = new();
     private readonly Mock<IPaymentRepository> _paymentRepoMock = new();
     private readonly Mock<IEventResourceCache> _eventResourceCacheMock = new();
+    private readonly ISeatBookingGate _seatBookingGate = new SeatBookingGate();
 
     public OrdersControllerTests()
     {
@@ -33,7 +34,7 @@ public class OrdersControllerTests
         _unitOfWorkMock.Setup(u => u.RollbackTransactionAsync()).Returns(Task.CompletedTask);
     }
 
-    private OrdersController CreateController() => new(_unitOfWorkMock.Object, _eventResourceCacheMock.Object);
+    private OrdersController CreateController() => new(_unitOfWorkMock.Object, _eventResourceCacheMock.Object, _seatBookingGate);
 
     // ── GetCartAsync ─────────────────────────────────────────────────────────
 
