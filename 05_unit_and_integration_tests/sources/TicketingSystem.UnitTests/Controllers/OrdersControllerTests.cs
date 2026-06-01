@@ -19,7 +19,6 @@ public class OrdersControllerTests
     private readonly Mock<ICustomerRepository> _customerRepoMock = new();
     private readonly Mock<IPaymentRepository> _paymentRepoMock = new();
     private readonly Mock<IEventResourceCache> _eventResourceCacheMock = new();
-    private readonly ISeatBookingGate _seatBookingGate = new SeatBookingGate();
 
     public OrdersControllerTests()
     {
@@ -34,7 +33,7 @@ public class OrdersControllerTests
         _unitOfWorkMock.Setup(u => u.RollbackTransactionAsync()).Returns(Task.CompletedTask);
     }
 
-    private OrdersController CreateController() => new(_unitOfWorkMock.Object, _eventResourceCacheMock.Object, _seatBookingGate);
+    private OrdersController CreateController() => new(_unitOfWorkMock.Object, _eventResourceCacheMock.Object);
 
     // ── GetCartAsync ─────────────────────────────────────────────────────────
 
@@ -218,7 +217,7 @@ public class OrdersControllerTests
     public async Task BookCartAsync_ReturnsConflict_WhenSeatNotAvailable()
     {
         var cartId = Guid.NewGuid();
-        var unavailableSeat = new EventSeat { Id = 1, Status = SeatStatus.Booked, EventId = 1, SeatId = 1 };
+        var unavailableSeat = new EventSeat { Id = 1, Status = SeatStatus.Available, EventId = 1, SeatId = 1 };
         var cart = new Cart
         {
             Id = cartId,
@@ -238,7 +237,7 @@ public class OrdersControllerTests
     public async Task BookCartAsync_ReturnsOk_WithPaymentId_WhenSuccessful()
     {
         var cartId = Guid.NewGuid();
-        var seat = new EventSeat { Id = 1, Status = SeatStatus.Available, EventId = 1, SeatId = 1, Price = 50m };
+        var seat = new EventSeat { Id = 1, Status = SeatStatus.Booked, EventId = 1, SeatId = 1, Price = 50m };
         var cart = new Cart
         {
             Id = cartId,

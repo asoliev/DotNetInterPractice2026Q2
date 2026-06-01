@@ -18,7 +18,6 @@ builder.Services.AddDbContext<TicketingDbContext>(options =>
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IEventResourceCache, EventResourceCache>();
-builder.Services.AddSingleton<ISeatBookingGate, SeatBookingGate>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

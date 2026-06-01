@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
-using TicketingSystem.DAL.Exceptions;
 using TicketingSystem.DAL.Interfaces;
 using TicketingSystem.Domain.Entities;
 using TicketingSystem.Domain.Enums;
@@ -13,8 +13,7 @@ namespace TicketingSystem.AsyncApi.Controllers;
 [Route("orders/carts/{cartId:guid}")]
 public class OrdersController(
     IUnitOfWork unitOfWork,
-    IEventResourceCache eventResourceCache,
-    ISeatBookingGate seatBookingGate) : ControllerBase
+    IEventResourceCache eventResourceCache) : ControllerBase
 {
     [HttpGet("")]
     public async Task<ActionResult<CartResponse>> GetCartAsync(Guid cartId)
@@ -26,66 +25,77 @@ public class OrdersController(
     [HttpPost("")]
     public async Task<ActionResult<CartResponse>> AddSeatToCartAsync(Guid cartId, [FromBody] AddSeatToCartRequest request)
     {
+        if (request.PriceId <= 0)
+            return BadRequest(new ApiErrorResponse { Message = "priceId must be greater than 0." });
+
+        await unitOfWork.BeginTransactionAsync();
         try
         {
-            return await seatBookingGate.ExecuteAsync<ActionResult<CartResponse>>(request.EventId, request.SeatId, async () =>
+            EventSeat? eventSeat = await unitOfWork.EventSeats.GetByEventAndSeatAsync(request.EventId, request.SeatId);
+
+            if (eventSeat is null)
             {
-                if (request.PriceId <= 0)
-                    return BadRequest(new ApiErrorResponse { Message = "priceId must be greater than 0." });
+                await unitOfWork.RollbackTransactionAsync();
+                return NotFound(new ApiErrorResponse { Message = "Seat for the event was not found." });
+            }
 
-                await unitOfWork.BeginTransactionAsync();
-                try
+            if (eventSeat.Status != SeatStatus.Available)
+            {
+                await unitOfWork.RollbackTransactionAsync();
+                return Conflict(new ApiErrorResponse { Message = "Seat is not available." });
+            }
+
+            eventSeat.Status = SeatStatus.Booked;
+
+            Cart cart = await GetOrCreateCartAsync(cartId);
+            CartItem? existingItem = await unitOfWork.Carts.GetItemAsync(cartId, request.EventId, request.SeatId);
+            if (existingItem is null)
+            {
+                await unitOfWork.Carts.AddItemAsync(new CartItem
                 {
-                    EventSeat? eventSeat = await unitOfWork.EventSeats.GetByEventAndSeatAsync(request.EventId, request.SeatId);
+                    CartId = cartId,
+                    EventSeatId = eventSeat.Id,
+                    PriceId = request.PriceId
+                });
+                cart.UpdatedAt = DateTime.UtcNow;
+            }
 
-                    if (eventSeat is null)
-                        return NotFound(new ApiErrorResponse { Message = "Seat for the event was not found." });
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitTransactionAsync();
+            eventResourceCache.Invalidate();
 
-                    if (eventSeat.Status != SeatStatus.Available)
-                        throw new SeatUnavailableException(eventSeat.Id);
+            Cart? persistedCart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
+            if (persistedCart is null)
+                return NotFound(new ApiErrorResponse { Message = $"Cart {cartId} not found." });
 
-                    Cart cart = await GetOrCreateCartAsync(cartId);
-                    CartItem? existingItem = await unitOfWork.Carts.GetItemAsync(cartId, request.EventId, request.SeatId);
-                    if (existingItem is null)
-                    {
-                        await unitOfWork.Carts.AddItemAsync(new CartItem
-                        {
-                            CartId = cartId,
-                            EventSeatId = eventSeat.Id,
-                            PriceId = request.PriceId
-                        });
-                        cart.UpdatedAt = DateTime.UtcNow;
-                        await unitOfWork.SaveChangesAsync();
-                    }
-
-                    Cart? persistedCart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
-                    if (persistedCart is null)
-                        return NotFound(new ApiErrorResponse { Message = $"Cart {cartId} not found." });
-
-                    await unitOfWork.CommitTransactionAsync();
-                    eventResourceCache.Invalidate();
-
-                    CartResponse state = BuildCartState(persistedCart);
-                    return Ok(state);
-                }
-                catch
-                {
-                    try
-                    {
-                        await unitOfWork.RollbackTransactionAsync();
-                    }
-                    catch
-                    {
-                        // Preserve the original exception if rollback fails.
-                    }
-
-                    throw;
-                }
-            });
+            CartResponse state = BuildCartState(persistedCart);
+            return Ok(state);
         }
-        catch (SeatUnavailableException)
+        catch (DbUpdateConcurrencyException)
         {
+            try
+            {
+                await unitOfWork.RollbackTransactionAsync();
+            }
+            catch
+            {
+                // Preserve the original exception if rollback fails.
+            }
+
             return Conflict(new ApiErrorResponse { Message = "Seat is not available." });
+        }
+        catch
+        {
+            try
+            {
+                await unitOfWork.RollbackTransactionAsync();
+            }
+            catch
+            {
+                // Preserve the original exception if rollback fails.
+            }
+
+            throw;
         }
     }
 
@@ -124,10 +134,10 @@ public class OrdersController(
 
         foreach (CartItem cartItem in cart.Items)
         {
-            if (cartItem.EventSeat.Status != SeatStatus.Available)
+            if (cartItem.EventSeat.Status != SeatStatus.Booked)
                 return Conflict(new ApiErrorResponse
                 {
-                    Message = $"Seat {cartItem.EventSeat.SeatId} for event {cartItem.EventSeat.EventId} is not available."
+                    Message = $"Seat {cartItem.EventSeat.SeatId} for event {cartItem.EventSeat.EventId} is not booked."
                 });
         }
 
@@ -148,8 +158,6 @@ public class OrdersController(
 
             foreach (CartItem cartItem in cart.Items)
             {
-                cartItem.EventSeat.Status = SeatStatus.Booked;
-
                 order.Items.Add(new OrderItem
                 {
                     EventSeatId = cartItem.EventSeatId,

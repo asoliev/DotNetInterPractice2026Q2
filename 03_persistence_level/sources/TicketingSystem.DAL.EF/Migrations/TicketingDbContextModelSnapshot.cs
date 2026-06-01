@@ -127,6 +127,7 @@ namespace TicketingSystem.DAL.EF.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
