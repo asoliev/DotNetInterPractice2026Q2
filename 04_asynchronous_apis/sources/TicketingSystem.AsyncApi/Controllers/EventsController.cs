@@ -130,7 +130,7 @@ public class EventsController(
         };
         responseHeaders.ETag = metadata.ETag;
         responseHeaders.LastModified = metadata.LastModified;
-        responseHeaders.Expires = metadata.LastModified.AddSeconds(30);
+        responseHeaders.Expires = DateTimeOffset.UtcNow.AddSeconds(30);
         response.Headers.Vary = "Accept";
     }
 }
