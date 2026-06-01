@@ -1,0 +1,1 @@
+The purpose of the module is to consolidate in practice the materials on ‘Debugging’ and ‘Logging’ modules on the example of troubleshooting the concurrency issue. In addition, you will learn about concurrency resolution strategies.
