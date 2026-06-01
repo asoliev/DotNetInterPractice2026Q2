@@ -78,14 +78,15 @@ public sealed class EventResourceCache(IMemoryCache memoryCache) : IEventResourc
 
     public void Invalidate()
     {
+        Interlocked.Increment(ref _version);
+        Interlocked.Exchange(ref _lastModifiedTicks, DateTimeOffset.UtcNow.Ticks);
+
         foreach (string key in _trackedCacheKeys.Keys)
         {
             memoryCache.Remove(key);
         }
 
         _trackedCacheKeys.Clear();
-        Interlocked.Increment(ref _version);
-        Interlocked.Exchange(ref _lastModifiedTicks, DateTimeOffset.UtcNow.Ticks);
     }
 
     public static string BuildSectionSeatsResourceKey(int eventId, int sectionId) =>
