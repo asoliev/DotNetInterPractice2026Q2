@@ -66,7 +66,7 @@ public class TicketingDbContext(DbContextOptions<TicketingDbContext> options) : 
         {
             e.HasKey(es => es.Id);
             e.Property(es => es.Price).HasColumnType("decimal(18,2)");
-            e.Property(es => es.Status).HasConversion<int>();
+            e.Property(es => es.Status).HasConversion<int>().IsConcurrencyToken();
             e.HasIndex(es => new { es.EventId, es.SeatId }).IsUnique();
             e.HasOne(es => es.Event)
                 .WithMany(ev => ev.EventSeats)

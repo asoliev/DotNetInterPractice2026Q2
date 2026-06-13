@@ -1,0 +1,4 @@
+-   Revise ‘Debugging Fundamentals’ and ‘Logging’ module from [Basic.NET](https://learn.epam.com/detailsPage?id=1d6fcef8-36ae-4102-ae4b-ed6ff1641077) course (review, 60 min)
+-   [Optimistic vs Pessimistic Concurrency](https://how.dev/answers/whats-the-difference-between-optimistic-and-pessimistic-locking)
+-   [Handling Concurrency Conflicts in EF Core](https://learn.microsoft.com/en-us/ef/core/saving/concurrency?tabs=data-annotations)
+-   [Transaction Isolation Levels](https://learn.microsoft.com/en-us/sql/odbc/reference/develop-app/transaction-isolation-levels)

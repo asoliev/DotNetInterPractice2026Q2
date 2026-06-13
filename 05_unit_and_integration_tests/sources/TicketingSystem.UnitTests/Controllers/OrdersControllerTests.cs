@@ -217,7 +217,7 @@ public class OrdersControllerTests
     public async Task BookCartAsync_ReturnsConflict_WhenSeatNotAvailable()
     {
         var cartId = Guid.NewGuid();
-        var unavailableSeat = new EventSeat { Id = 1, Status = SeatStatus.Booked, EventId = 1, SeatId = 1 };
+        var unavailableSeat = new EventSeat { Id = 1, Status = SeatStatus.Available, EventId = 1, SeatId = 1 };
         var cart = new Cart
         {
             Id = cartId,
@@ -237,7 +237,7 @@ public class OrdersControllerTests
     public async Task BookCartAsync_ReturnsOk_WithPaymentId_WhenSuccessful()
     {
         var cartId = Guid.NewGuid();
-        var seat = new EventSeat { Id = 1, Status = SeatStatus.Available, EventId = 1, SeatId = 1, Price = 50m };
+        var seat = new EventSeat { Id = 1, Status = SeatStatus.Booked, EventId = 1, SeatId = 1, Price = 50m };
         var cart = new Cart
         {
             Id = cartId,

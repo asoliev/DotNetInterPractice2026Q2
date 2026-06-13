@@ -97,6 +97,31 @@ public class TicketOrderingIntegrationTests : IClassFixture<TicketingWebApplicat
     }
 
     [Fact]
+    public async Task AddSeatToCart_WhenManyRequestsTargetSameSeat_OnlyOneSucceeds()
+    {
+        (int eventId, int seatId) = await GetFirstAvailableSeatAsync();
+        const int requestCount = 1000;
+
+        Task<HttpStatusCode>[] requests = [.. Enumerable.Range(0, requestCount)
+            .Select(async _ =>
+            {
+                var cartId = Guid.NewGuid();
+                HttpResponseMessage response = await _client.PostAsJsonAsync($"/orders/carts/{cartId}", new AddSeatToCartRequest
+                {
+                    EventId = eventId,
+                    SeatId = seatId,
+                    PriceId = 1
+                });
+
+                return response.StatusCode;
+            })];
+
+        HttpStatusCode[] statuses = await Task.WhenAll(requests);
+
+        Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.OK));
+    }
+
+    [Fact]
     public async Task AddSeatToCart_WhenSeatNotFound_ReturnsNotFound()
     {
         var cartId = Guid.NewGuid();
