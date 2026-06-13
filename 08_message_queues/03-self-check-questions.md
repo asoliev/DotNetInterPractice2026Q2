@@ -1,0 +1,5 @@
+1.  What is a message queue? What do message queues store and transfer? 
+2.  Describe the publisher/subscriber pattern. The difference between Pub/Sub and Observable patterns.
+3.  What is a Message Bus? How does it work? 
+4.  What is the difference between message queue and web services? 
+5.  Describe the difference between RabbitMQ and Kafka. Provide some use cases for each of them: in which scenarios you’ll use RabbitMQ, Kafka?
