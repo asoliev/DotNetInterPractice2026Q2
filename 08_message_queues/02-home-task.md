@@ -1,4 +1,4 @@
-Task 1 
+## Task 1 
 In the home task we will implement a system of sending email notifications. In real world applications email confirmations are usually sent to users on different business events, like placing an order, payment confirmation, etc.
 
 The process of sending notifications should be asynchronous. General practice is message queues for this interaction pattern.
@@ -23,7 +23,7 @@ On this step notification handler should notification request tatus in database 
 
 Mailject and SendGrid are commonly used and provide REST API for forming and sending email envelopes. Notification handler should trigger email provider API endpoint and wait for the result. Notification operation result could be shown in console based on the status of the response (success – email is successfully sent, error – email provider returned failure in the response).
 
-Task 2
+## Task 2
 Extend the logic of interaction between notification handler and email provider by implementing retry policy. You can use Polly ([](https://github.com/App-vNext/Polly)  [https://github.com/App-vNext/Polly](https://github.com/App-vNext/Polly)) for setting retry policy for requests triggering Email provider API.
 
 ![Sequence Diagram With Retry Policy](./images/01-task2-image.png)
