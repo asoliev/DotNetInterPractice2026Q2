@@ -38,6 +38,14 @@ dotnet build 04_asynchronous_apis/sources/TicketingSystem.AsyncApi.slnx
 dotnet run --project 04_asynchronous_apis/sources/TicketingSystem.AsyncApi/TicketingSystem.AsyncApi.csproj --urls http://localhost:5188
 ```
 
+RabbitMQ should be running locally before you start the API. The defaults in `appsettings.json` expect:
+
+- host: `localhost`
+- port: `5672`
+- username/password: `guest` / `guest`
+
+For real email delivery, set `SendGrid:ApiKey` and `SendGrid:FromEmail` in `appsettings.json` or environment variables.
+
 ## Swagger UI
 
 After starting the app, open:
@@ -131,10 +139,11 @@ Seats response includes:
 
 - Cart state is persisted in SQLite (`Carts` and `CartItems` tables) keyed by client-provided cart GUID.
 - Payment state is persisted in SQLite (`Payments` table) keyed by generated payment GUID.
+- Notification request state is stored in SQLite and initialized automatically at startup.
 - Booking flow marks seats as `Booked`, creates an order, and creates a pending payment.
 - Completing payment marks related seats as `Sold`.
 - Failing payment marks related seats back to `Available`.
-- After successful add-to-cart and checkout operations, the API enqueues notification messages into an in-memory queue and a hosted background service logs the email-provider flow.
+- After successful add-to-cart and checkout operations, the API publishes notification messages to RabbitMQ and a hosted consumer sends them to the configured email provider.
 
 ## Quick Smoke Test Example
 

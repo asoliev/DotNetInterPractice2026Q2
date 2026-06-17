@@ -58,11 +58,11 @@ public sealed class NotificationStatusStore(TicketingDbContext dbContext) : INot
         string? lastError,
         CancellationToken cancellationToken)
     {
-        const string sql = """
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
         INSERT INTO NotificationRequests
             (TrackingId, OperationName, CustomerEmail, CustomerName, ContentJson, Status, CreatedAt, UpdatedAt, LastError, ProviderMessage)
         VALUES
-            ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9})
+            ({message.TrackingId}, {message.OperationName}, {message.Parameters.CustomerEmail}, {message.Parameters.CustomerName}, {JsonSerializer.Serialize(message.Content)}, {status.ToString()}, {message.Timestamp.UtcDateTime}, {DateTime.UtcNow}, {lastError}, {providerMessage})
         ON CONFLICT(TrackingId) DO UPDATE SET
             OperationName = excluded.OperationName,
             CustomerEmail = excluded.CustomerEmail,
@@ -72,23 +72,7 @@ public sealed class NotificationStatusStore(TicketingDbContext dbContext) : INot
             UpdatedAt = excluded.UpdatedAt,
             LastError = excluded.LastError,
             ProviderMessage = excluded.ProviderMessage;
-        """;
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            sql,
-            [
-                message.TrackingId,
-                message.OperationName,
-                message.Parameters.CustomerEmail,
-                message.Parameters.CustomerName,
-                JsonSerializer.Serialize(message.Content),
-                status.ToString(),
-                message.Timestamp.UtcDateTime,
-                DateTime.UtcNow,
-                lastError is null ? DBNull.Value : lastError,
-                providerMessage is null ? DBNull.Value : providerMessage
-            ],
-            cancellationToken);
+        """, cancellationToken);
     }
 
     private async Task UpdateStatusAsync(
@@ -98,21 +82,10 @@ public sealed class NotificationStatusStore(TicketingDbContext dbContext) : INot
         string? lastError,
         CancellationToken cancellationToken)
     {
-        const string sql = """
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
         UPDATE NotificationRequests
-        SET Status = {1}, UpdatedAt = {2}, LastError = {3}, ProviderMessage = {4}
-        WHERE TrackingId = {0};
-        """;
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            sql,
-            [
-                trackingId,
-                status.ToString(),
-                DateTime.UtcNow,
-                lastError is null ? DBNull.Value : lastError,
-                providerMessage is null ? DBNull.Value : providerMessage
-            ],
-            cancellationToken);
+        SET Status = {status.ToString()}, UpdatedAt = {DateTime.UtcNow}, LastError = {lastError}, ProviderMessage = {providerMessage}
+        WHERE TrackingId = {trackingId};
+        """, cancellationToken);
     }
 }

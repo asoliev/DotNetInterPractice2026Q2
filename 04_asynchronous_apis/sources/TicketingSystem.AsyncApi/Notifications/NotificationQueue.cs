@@ -37,8 +37,7 @@ public sealed class RabbitMqNotificationPublisher(IOptions<RabbitMqOptions> opti
             Port = _options.Port,
             UserName = _options.UserName,
             Password = _options.Password,
-            VirtualHost = _options.VirtualHost,
-            DispatchConsumersAsync = true
+            VirtualHost = _options.VirtualHost
         };
 
         using IConnection connection = factory.CreateConnection();

@@ -25,8 +25,7 @@ public sealed class NotificationProcessorHostedService(
             Port = options.Port,
             UserName = options.UserName,
             Password = options.Password,
-            VirtualHost = options.VirtualHost,
-            DispatchConsumersAsync = true
+            VirtualHost = options.VirtualHost
         };
 
         using IConnection connection = factory.CreateConnection();
