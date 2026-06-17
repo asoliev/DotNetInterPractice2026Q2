@@ -19,7 +19,11 @@ builder.Services.AddDbContext<TicketingDbContext>(options =>
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IEventResourceCache, EventResourceCache>();
-builder.Services.AddSingleton<INotificationQueue, InMemoryNotificationQueue>();
+builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMq"));
+builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
+builder.Services.AddSingleton<INotificationPublisher, RabbitMqNotificationPublisher>();
+builder.Services.AddScoped<INotificationStatusStore, NotificationStatusStore>();
+builder.Services.AddHttpClient<IEmailProviderClient, SendGridEmailProviderClient>();
 builder.Services.AddHostedService<NotificationProcessorHostedService>();
 
 builder.Services.AddControllers();
@@ -34,6 +38,9 @@ using (IServiceScope scope = app.Services.CreateScope())
 {
     TicketingDbContext dbContext = scope.ServiceProvider.GetRequiredService<TicketingDbContext>();
     await SeedData.InitializeAsync(dbContext);
+
+    INotificationStatusStore notificationStatusStore = scope.ServiceProvider.GetRequiredService<INotificationStatusStore>();
+    await notificationStatusStore.EnsureSchemaAsync();
 }
 
 app.UseHttpsRedirection();

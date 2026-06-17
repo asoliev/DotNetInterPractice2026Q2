@@ -15,7 +15,8 @@ namespace TicketingSystem.AsyncApi.Controllers;
 public class OrdersController(
     IUnitOfWork unitOfWork,
     IEventResourceCache eventResourceCache,
-    INotificationQueue notificationQueue) : ControllerBase
+    INotificationPublisher notificationPublisher,
+    INotificationStatusStore notificationStatusStore) : ControllerBase
 {
     [HttpGet("")]
     public async Task<ActionResult<CartResponse>> GetCartAsync(Guid cartId)
@@ -66,7 +67,8 @@ public class OrdersController(
             await unitOfWork.CommitTransactionAsync();
             eventResourceCache.Invalidate();
 
-            await notificationQueue.EnqueueAsync(CreateSeatAddedNotification(cartId, eventSeat, request.PriceId));
+            NotificationMessage addSeatNotification = CreateSeatAddedNotification(cartId, eventSeat, request.PriceId);
+            await DispatchNotificationAsync(addSeatNotification);
 
             Cart? persistedCart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
             if (persistedCart is null)
@@ -187,7 +189,8 @@ public class OrdersController(
 
             eventResourceCache.Invalidate();
 
-            await notificationQueue.EnqueueAsync(CreateCheckoutNotification(cartId, customer, payment, cartItemsSnapshot));
+            NotificationMessage checkoutNotification = CreateCheckoutNotification(cartId, customer, payment, cartItemsSnapshot);
+            await DispatchNotificationAsync(checkoutNotification);
 
             return Ok(new BookCartResponse { PaymentId = payment.Id });
         }
@@ -299,5 +302,19 @@ public class OrdersController(
             new NotificationContent(
                 orderAmount,
                 $"Payment {payment.Id}, cart {cartId:N}, items: {orderSummary}"));
+    }
+
+    private async Task DispatchNotificationAsync(NotificationMessage notificationMessage)
+    {
+        try
+        {
+            await notificationStatusStore.CreatePendingAsync(notificationMessage);
+            await notificationPublisher.PublishAsync(notificationMessage);
+        }
+        catch (Exception exception)
+        {
+            await notificationStatusStore.MarkFailedAsync(notificationMessage.TrackingId, exception.Message);
+            throw;
+        }
     }
 }
