@@ -134,6 +134,7 @@ Seats response includes:
 - Booking flow marks seats as `Booked`, creates an order, and creates a pending payment.
 - Completing payment marks related seats as `Sold`.
 - Failing payment marks related seats back to `Available`.
+- After successful add-to-cart and checkout operations, the API enqueues notification messages into an in-memory queue and a hosted background service logs the email-provider flow.
 
 ## Quick Smoke Test Example
 

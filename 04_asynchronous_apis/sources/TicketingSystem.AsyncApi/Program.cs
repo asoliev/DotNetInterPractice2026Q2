@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TicketingSystem.AsyncApi;
 using TicketingSystem.AsyncApi.Caching;
+using TicketingSystem.AsyncApi.Notifications;
 using TicketingSystem.DAL.EF;
 using TicketingSystem.DAL.Interfaces;
 
@@ -18,6 +19,8 @@ builder.Services.AddDbContext<TicketingDbContext>(options =>
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IEventResourceCache, EventResourceCache>();
+builder.Services.AddSingleton<INotificationQueue, InMemoryNotificationQueue>();
+builder.Services.AddHostedService<NotificationProcessorHostedService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
