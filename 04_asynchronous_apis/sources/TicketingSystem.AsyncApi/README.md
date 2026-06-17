@@ -44,7 +44,9 @@ RabbitMQ should be running locally before you start the API. The defaults in `ap
 - port: `5672`
 - username/password: `guest` / `guest`
 
-For real email delivery, set `SendGrid:ApiKey` and `SendGrid:FromEmail` in `appsettings.json` or environment variables.
+For real email delivery, set `Mailjet:ApiKey`, `Mailjet:ApiSecret`, and `Mailjet:FromEmail` in `appsettings.json` or environment variables.
+
+If those settings are left empty, the API uses a local mock email provider that reports `Sent` without calling Mailjet.
 
 ## Swagger UI
 

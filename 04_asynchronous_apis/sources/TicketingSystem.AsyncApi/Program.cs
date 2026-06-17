@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using TicketingSystem.AsyncApi;
 using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Notifications;
@@ -20,10 +21,19 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IEventResourceCache, EventResourceCache>();
 builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMq"));
-builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
+builder.Services.Configure<MailjetOptions>(builder.Configuration.GetSection("Mailjet"));
 builder.Services.AddSingleton<INotificationPublisher, RabbitMqNotificationPublisher>();
 builder.Services.AddScoped<INotificationStatusStore, NotificationStatusStore>();
-builder.Services.AddHttpClient<IEmailProviderClient, SendGridEmailProviderClient>();
+builder.Services.AddHttpClient<MailjetEmailProviderClient>();
+builder.Services.AddScoped<LocalMockEmailProviderClient>();
+builder.Services.AddScoped<IEmailProviderClient>(serviceProvider =>
+{
+    MailjetOptions options = serviceProvider.GetRequiredService<IOptions<MailjetOptions>>().Value;
+    if (!string.IsNullOrWhiteSpace(options.ApiKey) && !string.IsNullOrWhiteSpace(options.ApiSecret) && !string.IsNullOrWhiteSpace(options.FromEmail))
+        return serviceProvider.GetRequiredService<MailjetEmailProviderClient>();
+
+    return serviceProvider.GetRequiredService<LocalMockEmailProviderClient>();
+});
 builder.Services.AddHostedService<NotificationProcessorHostedService>();
 
 builder.Services.AddControllers();

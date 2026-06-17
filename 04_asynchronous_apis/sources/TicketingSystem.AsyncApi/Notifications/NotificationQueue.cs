@@ -29,7 +29,7 @@ public sealed class RabbitMqNotificationPublisher(IOptions<RabbitMqOptions> opti
 {
     private readonly RabbitMqOptions _options = options.Value;
 
-    public Task PublishAsync(NotificationMessage message, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(NotificationMessage message, CancellationToken cancellationToken = default)
     {
         ConnectionFactory factory = new()
         {
@@ -40,27 +40,23 @@ public sealed class RabbitMqNotificationPublisher(IOptions<RabbitMqOptions> opti
             VirtualHost = _options.VirtualHost
         };
 
-        using IConnection connection = factory.CreateConnection();
-        using IModel channel = connection.CreateModel();
+        await using IConnection connection = await factory.CreateConnectionAsync(cancellationToken);
+        await using IChannel channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
-        channel.QueueDeclare(
+        await channel.QueueDeclareAsync(
             queue: _options.QueueName,
             durable: true,
             exclusive: false,
             autoDelete: false,
-            arguments: null);
+            arguments: null,
+            cancellationToken: cancellationToken);
 
         byte[] body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
 
-        IBasicProperties properties = channel.CreateBasicProperties();
-        properties.Persistent = true;
-
-        channel.BasicPublish(
+        await channel.BasicPublishAsync(
             exchange: string.Empty,
             routingKey: _options.QueueName,
-            basicProperties: properties,
-            body: body);
-
-        return Task.CompletedTask;
+            body: body,
+            cancellationToken: cancellationToken);
     }
 }

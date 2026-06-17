@@ -28,26 +28,27 @@ public sealed class NotificationProcessorHostedService(
             VirtualHost = options.VirtualHost
         };
 
-        using IConnection connection = factory.CreateConnection();
-        using IModel channel = connection.CreateModel();
+        await using IConnection connection = await factory.CreateConnectionAsync(stoppingToken);
+        await using IChannel channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
 
-        channel.QueueDeclare(
+        await channel.QueueDeclareAsync(
             queue: options.QueueName,
             durable: true,
             exclusive: false,
             autoDelete: false,
-            arguments: null);
+            arguments: null,
+            cancellationToken: stoppingToken);
 
-        channel.BasicQos(0, 1, false);
+        await channel.BasicQosAsync(0, 1, false, stoppingToken);
 
-        EventingBasicConsumer consumer = new(channel);
-        consumer.Received += async (_, eventArgs) =>
+        AsyncEventingBasicConsumer consumer = new(channel);
+        consumer.ReceivedAsync += async (_, eventArgs) =>
         {
             NotificationMessage? message = JsonSerializer.Deserialize<NotificationMessage>(Encoding.UTF8.GetString(eventArgs.Body.ToArray()));
             if (message is null)
             {
                 logger.LogWarning("RabbitMQ message could not be deserialized.");
-                channel.BasicNack(eventArgs.DeliveryTag, multiple: false, requeue: false);
+                await channel.BasicNackAsync(eventArgs.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
                 return;
             }
 
@@ -86,7 +87,7 @@ public sealed class NotificationProcessorHostedService(
                         result.Message);
                 }
 
-                channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+                await channel.BasicAckAsync(eventArgs.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
             }
             catch (Exception exception)
             {
@@ -98,11 +99,19 @@ public sealed class NotificationProcessorHostedService(
                     message.Parameters.CustomerEmail,
                     exception.Message);
 
-                channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+                await channel.BasicAckAsync(eventArgs.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
             }
         };
 
-        channel.BasicConsume(queue: options.QueueName, autoAck: false, consumer: consumer);
+        await channel.BasicConsumeAsync(
+            queue: options.QueueName,
+            autoAck: false,
+            consumerTag: string.Empty,
+            noLocal: false,
+            exclusive: false,
+            arguments: null,
+            consumer: consumer,
+            cancellationToken: stoppingToken);
 
         TaskCompletionSource stopSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
         using CancellationTokenRegistration registration = stoppingToken.Register(() => stopSignal.TrySetResult());
