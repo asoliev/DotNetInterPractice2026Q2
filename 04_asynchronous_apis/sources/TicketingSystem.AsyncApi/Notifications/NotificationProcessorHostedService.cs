@@ -1,12 +1,10 @@
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using TicketingSystem.DAL.EF;
 
 namespace TicketingSystem.AsyncApi.Notifications;
 
@@ -15,6 +13,13 @@ public sealed class NotificationProcessorHostedService(
     IOptions<RabbitMqOptions> rabbitMqOptions,
     ILogger<NotificationProcessorHostedService> logger) : BackgroundService
 {
+    private static readonly AsyncRetryPolicy<EmailSendResult> EmailSendRetryPolicy = Policy<EmailSendResult>
+        .Handle<Exception>()
+        .OrResult(result => !result.IsSuccess)
+        .WaitAndRetryAsync(
+            retryCount: 3,
+            sleepDurationProvider: _ => TimeSpan.FromSeconds(2));
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         RabbitMqOptions options = rabbitMqOptions.Value;
@@ -65,7 +70,9 @@ public sealed class NotificationProcessorHostedService(
 
             try
             {
-                EmailSendResult result = await emailProvider.SendAsync(CreateEmailRequest(message), stoppingToken);
+                EmailSendResult result = await EmailSendRetryPolicy.ExecuteAsync(
+                    async ct => await emailProvider.SendAsync(CreateEmailRequest(message), ct),
+                    stoppingToken);
 
                 if (result.IsSuccess)
                 {
