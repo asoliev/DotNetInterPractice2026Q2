@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Retry;
@@ -59,7 +60,7 @@ public sealed class NotificationProcessorHostedService(
 
             using IServiceScope scope = scopeFactory.CreateScope();
             INotificationStatusStore statusStore = scope.ServiceProvider.GetRequiredService<INotificationStatusStore>();
-            IEmailProviderClient emailProvider = scope.ServiceProvider.GetRequiredService<IEmailProviderClient>();
+            IReadOnlyCollection<INotificationDistributionChannel> channels = scope.ServiceProvider.GetServices<INotificationDistributionChannel>().ToArray();
 
             logger.LogInformation(
                 "Notification {TrackingId} moved to in progress for operation {OperationName}.",
@@ -70,28 +71,92 @@ public sealed class NotificationProcessorHostedService(
 
             try
             {
-                EmailSendResult result = await EmailSendRetryPolicy.ExecuteAsync(
-                    async ct => await emailProvider.SendAsync(CreateEmailRequest(message), ct),
-                    stoppingToken);
-
-                if (result.IsSuccess)
+                if (channels.Count == 0)
                 {
-                    await statusStore.MarkSentAsync(message.TrackingId, result.Message, stoppingToken);
+                    const string noChannelsMessage = "No notification distribution channels are registered.";
+                    await statusStore.MarkFailedAsync(message.TrackingId, noChannelsMessage, stoppingToken);
 
-                    logger.LogInformation(
-                        "Email provider accepted notification {TrackingId} for {CustomerEmail}.",
+                    logger.LogWarning(
+                        "Notification {TrackingId} for {CustomerEmail} could not be processed: {Message}",
                         message.TrackingId,
-                        message.Parameters.CustomerEmail);
+                        message.Parameters.CustomerEmail,
+                        noChannelsMessage);
                 }
                 else
                 {
-                    await statusStore.MarkFailedAsync(message.TrackingId, result.Message, stoppingToken);
+                    List<string> failureMessages = [];
+                    string? successMessage = null;
+                    bool anySuccess = false;
 
-                    logger.LogWarning(
-                        "Email provider rejected notification {TrackingId} for {CustomerEmail}: {Message}",
-                        message.TrackingId,
-                        message.Parameters.CustomerEmail,
-                        result.Message);
+                    foreach (INotificationDistributionChannel distributionChannel in channels)
+                    {
+                        string channelName = distributionChannel.GetType().Name;
+
+                        try
+                        {
+                            EmailSendResult result = await EmailSendRetryPolicy.ExecuteAsync(
+                                async ct => await distributionChannel.ProcessAsync(message, ct),
+                                stoppingToken);
+
+                            if (result.IsSuccess)
+                            {
+                                anySuccess = true;
+                                successMessage ??= result.Message;
+
+                                logger.LogInformation(
+                                    "Notification channel {ChannelName} accepted notification {TrackingId} for {CustomerEmail}.",
+                                    channelName,
+                                    message.TrackingId,
+                                    message.Parameters.CustomerEmail);
+                            }
+                            else
+                            {
+                                failureMessages.Add($"{channelName}: {result.Message}");
+
+                                logger.LogWarning(
+                                    "Notification channel {ChannelName} rejected notification {TrackingId} for {CustomerEmail}: {Message}",
+                                    channelName,
+                                    message.TrackingId,
+                                    message.Parameters.CustomerEmail,
+                                    result.Message);
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            failureMessages.Add($"{channelName}: {exception.Message}");
+
+                            logger.LogWarning(
+                                exception,
+                                "Notification channel {ChannelName} failed for notification {TrackingId} for {CustomerEmail}.",
+                                channelName,
+                                message.TrackingId,
+                                message.Parameters.CustomerEmail);
+                        }
+                    }
+
+                    if (anySuccess)
+                    {
+                        await statusStore.MarkSentAsync(message.TrackingId, successMessage ?? "Notification accepted by at least one channel.", stoppingToken);
+
+                        logger.LogInformation(
+                            "Notification {TrackingId} was accepted by at least one distribution channel for {CustomerEmail}.",
+                            message.TrackingId,
+                            message.Parameters.CustomerEmail);
+                    }
+                    else
+                    {
+                        string failureMessage = failureMessages.Count > 0
+                            ? string.Join(" | ", failureMessages)
+                            : "Notification processing failed for all registered channels.";
+
+                        await statusStore.MarkFailedAsync(message.TrackingId, failureMessage, stoppingToken);
+
+                        logger.LogWarning(
+                            "Notification {TrackingId} failed for {CustomerEmail}: {Message}",
+                            message.TrackingId,
+                            message.Parameters.CustomerEmail,
+                            failureMessage);
+                    }
                 }
 
                 await channel.BasicAckAsync(eventArgs.DeliveryTag, multiple: false, cancellationToken: stoppingToken);

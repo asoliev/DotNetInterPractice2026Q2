@@ -14,7 +14,7 @@ public sealed class MailjetOptions
     public string FromName { get; set; } = "Ticketing System";
 }
 
-public interface IEmailProviderClient
+public interface IEmailProviderClient : INotificationDistributionChannel
 {
     Task<EmailSendResult> SendAsync(EmailRequest request, CancellationToken cancellationToken = default);
 }
@@ -22,6 +22,9 @@ public interface IEmailProviderClient
 public sealed class MailjetEmailProviderClient(HttpClient httpClient, IOptions<MailjetOptions> options) : IEmailProviderClient
 {
     private readonly MailjetOptions _options = options.Value;
+
+    public Task<EmailSendResult> ProcessAsync(NotificationMessage message, CancellationToken cancellationToken = default) =>
+        SendAsync(CreateEmailRequest(message), cancellationToken);
 
     public async Task<EmailSendResult> SendAsync(EmailRequest request, CancellationToken cancellationToken = default)
     {
@@ -58,5 +61,24 @@ public sealed class MailjetEmailProviderClient(HttpClient httpClient, IOptions<M
 
         string body = await response.Content.ReadAsStringAsync(cancellationToken);
         return new EmailSendResult(false, $"Mailjet returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+    }
+
+    private static EmailRequest CreateEmailRequest(NotificationMessage message)
+    {
+        string subject = $"[{message.OperationName}] Order confirmation for {message.Parameters.CustomerName}";
+        string body =
+            $"Hello {message.Parameters.CustomerName},\n\n" +
+            $"Operation: {message.OperationName}\n" +
+            $"Timestamp: {message.Timestamp:O}\n" +
+            $"Order amount: {message.Content.OrderAmount:C}\n" +
+            $"Order summary: {message.Content.OrderSummary}\n\n" +
+            $"Tracking id: {message.TrackingId}";
+
+        return new EmailRequest(
+            message.TrackingId,
+            message.Parameters.CustomerEmail,
+            message.Parameters.CustomerName,
+            subject,
+            body);
     }
 }

@@ -34,6 +34,7 @@ builder.Services.AddScoped<IEmailProviderClient>(serviceProvider =>
 
     return serviceProvider.GetRequiredService<LocalMockEmailProviderClient>();
 });
+builder.Services.AddScoped<INotificationDistributionChannel>(serviceProvider => serviceProvider.GetRequiredService<IEmailProviderClient>());
 builder.Services.AddHostedService<NotificationProcessorHostedService>();
 
 builder.Services.AddControllers();
