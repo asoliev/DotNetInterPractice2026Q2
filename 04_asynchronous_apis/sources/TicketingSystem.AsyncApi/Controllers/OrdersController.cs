@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
+using TicketingSystem.AsyncApi.Notifications;
 using TicketingSystem.DAL.Interfaces;
 using TicketingSystem.Domain.Entities;
 using TicketingSystem.Domain.Enums;
@@ -13,7 +14,9 @@ namespace TicketingSystem.AsyncApi.Controllers;
 [Route("orders/carts/{cartId:guid}")]
 public class OrdersController(
     IUnitOfWork unitOfWork,
-    IEventResourceCache eventResourceCache) : ControllerBase
+    IEventResourceCache eventResourceCache,
+    INotificationPublisher notificationPublisher,
+    INotificationStatusStore notificationStatusStore) : ControllerBase
 {
     [HttpGet("")]
     public async Task<ActionResult<CartResponse>> GetCartAsync(Guid cartId)
@@ -61,6 +64,10 @@ public class OrdersController(
             }
 
             await unitOfWork.SaveChangesAsync();
+
+            NotificationMessage addSeatNotification = CreateSeatAddedNotification(cartId, eventSeat, request.PriceId);
+            await DispatchNotificationAsync(addSeatNotification);
+
             await unitOfWork.CommitTransactionAsync();
             eventResourceCache.Invalidate();
 
@@ -145,6 +152,7 @@ public class OrdersController(
         try
         {
             Customer customer = await GetOrCreateCustomerForCartAsync(cartId);
+            List<CartItem> cartItemsSnapshot = cart.Items.ToList();
 
             Order order = new()
             {
@@ -178,6 +186,10 @@ public class OrdersController(
             cart.UpdatedAt = DateTime.UtcNow;
 
             await unitOfWork.SaveChangesAsync();
+
+            NotificationMessage checkoutNotification = CreateCheckoutNotification(cartId, customer, payment, cartItemsSnapshot);
+            await DispatchNotificationAsync(checkoutNotification);
+
             await unitOfWork.CommitTransactionAsync();
 
             eventResourceCache.Invalidate();
@@ -259,5 +271,52 @@ public class OrdersController(
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.SaveChangesAsync();
         return customer;
+    }
+
+    private static NotificationMessage CreateSeatAddedNotification(Guid cartId, EventSeat eventSeat, int priceId)
+    {
+        return new NotificationMessage(
+            Guid.NewGuid(),
+            "ticket added to checkout",
+            DateTimeOffset.UtcNow,
+            new NotificationParameters($"cart-{cartId:N}@example.local", $"Cart {cartId:N}"),
+            new NotificationContent(
+                eventSeat.Price,
+                $"Event {eventSeat.EventId}, seat {eventSeat.Seat.Row}-{eventSeat.Seat.Number}, price option {priceId}"));
+    }
+
+    private static NotificationMessage CreateCheckoutNotification(
+        Guid cartId,
+        Customer customer,
+        Payment payment,
+        IReadOnlyList<CartItem> cartItems)
+    {
+        decimal orderAmount = cartItems.Sum(item => item.EventSeat.Price);
+        string orderSummary = string.Join(
+            "; ",
+            cartItems.Select(item => $"Event {item.EventSeat.EventId}, seat {item.EventSeat.Seat.Row}-{item.EventSeat.Seat.Number}"));
+
+        return new NotificationMessage(
+            Guid.NewGuid(),
+            "ticket successfully checked out",
+            DateTimeOffset.UtcNow,
+            new NotificationParameters(customer.Email, customer.Name),
+            new NotificationContent(
+                orderAmount,
+                $"Payment {payment.Id}, cart {cartId:N}, items: {orderSummary}"));
+    }
+
+    private async Task DispatchNotificationAsync(NotificationMessage notificationMessage)
+    {
+        try
+        {
+            await notificationStatusStore.CreatePendingAsync(notificationMessage);
+            await notificationPublisher.PublishAsync(notificationMessage);
+        }
+        catch (Exception exception)
+        {
+            await notificationStatusStore.MarkFailedAsync(notificationMessage.TrackingId, exception.Message);
+            throw;
+        }
     }
 }

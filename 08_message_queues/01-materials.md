@@ -1,0 +1,3 @@
+-   [.NET Intermediate](https://learn.epam.com/detailsPage?id=0e7ecf71-8cce-4cd8-837e-eb660e61130d) course: Message queues module
+-   [Message queues and async patterns](https://www.freecodecamp.org/news/message-queues-in-distributed-systesms/)
+-   [Async pattern with Message Queues](https://medium.com/hookdeck/an-introduction-to-asynchronous-processing-and-message-queues-218af596bf1b)

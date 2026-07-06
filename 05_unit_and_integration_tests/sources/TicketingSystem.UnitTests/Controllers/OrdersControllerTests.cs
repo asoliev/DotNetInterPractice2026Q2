@@ -4,6 +4,7 @@ using TicketingSystem.AsyncApi.Caching;
 using TicketingSystem.AsyncApi.Contracts;
 using TicketingSystem.AsyncApi.Contracts.Responses;
 using TicketingSystem.AsyncApi.Controllers;
+using TicketingSystem.AsyncApi.Notifications;
 using TicketingSystem.DAL.Interfaces;
 using TicketingSystem.Domain.Entities;
 using TicketingSystem.Domain.Enums;
@@ -19,6 +20,8 @@ public class OrdersControllerTests
     private readonly Mock<ICustomerRepository> _customerRepoMock = new();
     private readonly Mock<IPaymentRepository> _paymentRepoMock = new();
     private readonly Mock<IEventResourceCache> _eventResourceCacheMock = new();
+    private readonly Mock<INotificationPublisher> _notificationPublisherMock = new();
+    private readonly Mock<INotificationStatusStore> _notificationStatusStoreMock = new();
 
     public OrdersControllerTests()
     {
@@ -31,9 +34,30 @@ public class OrdersControllerTests
         _unitOfWorkMock.Setup(u => u.BeginTransactionAsync()).Returns(Task.CompletedTask);
         _unitOfWorkMock.Setup(u => u.CommitTransactionAsync()).Returns(Task.CompletedTask);
         _unitOfWorkMock.Setup(u => u.RollbackTransactionAsync()).Returns(Task.CompletedTask);
+
+        _notificationPublisherMock
+            .Setup(p => p.PublishAsync(It.IsAny<NotificationMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _notificationStatusStoreMock
+            .Setup(s => s.CreatePendingAsync(It.IsAny<NotificationMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _notificationStatusStoreMock
+            .Setup(s => s.MarkInProgressAsync(It.IsAny<NotificationMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _notificationStatusStoreMock
+            .Setup(s => s.MarkSentAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _notificationStatusStoreMock
+            .Setup(s => s.MarkFailedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
     }
 
-    private OrdersController CreateController() => new(_unitOfWorkMock.Object, _eventResourceCacheMock.Object);
+    private OrdersController CreateController() => new(
+        _unitOfWorkMock.Object,
+        _eventResourceCacheMock.Object,
+        _notificationPublisherMock.Object,
+        _notificationStatusStoreMock.Object);
 
     // ── GetCartAsync ─────────────────────────────────────────────────────────
 

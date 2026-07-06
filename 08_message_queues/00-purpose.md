@@ -1,0 +1,1 @@
+The goal of this module is to provide an overview of messaging concepts and familiarize yourself with the most popular message queues implementations. Practical task includes implementation of the client-server application with interactions based on messaging pattern.
