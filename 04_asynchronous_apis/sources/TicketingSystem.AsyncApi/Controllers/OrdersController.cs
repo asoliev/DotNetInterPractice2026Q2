@@ -64,11 +64,12 @@ public class OrdersController(
             }
 
             await unitOfWork.SaveChangesAsync();
-            await unitOfWork.CommitTransactionAsync();
-            eventResourceCache.Invalidate();
 
             NotificationMessage addSeatNotification = CreateSeatAddedNotification(cartId, eventSeat, request.PriceId);
             await DispatchNotificationAsync(addSeatNotification);
+
+            await unitOfWork.CommitTransactionAsync();
+            eventResourceCache.Invalidate();
 
             Cart? persistedCart = await unitOfWork.Carts.GetWithItemsAsync(cartId);
             if (persistedCart is null)
@@ -185,12 +186,13 @@ public class OrdersController(
             cart.UpdatedAt = DateTime.UtcNow;
 
             await unitOfWork.SaveChangesAsync();
-            await unitOfWork.CommitTransactionAsync();
-
-            eventResourceCache.Invalidate();
 
             NotificationMessage checkoutNotification = CreateCheckoutNotification(cartId, customer, payment, cartItemsSnapshot);
             await DispatchNotificationAsync(checkoutNotification);
+
+            await unitOfWork.CommitTransactionAsync();
+
+            eventResourceCache.Invalidate();
 
             return Ok(new BookCartResponse { PaymentId = payment.Id });
         }
